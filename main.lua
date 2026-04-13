@@ -2,7 +2,7 @@ local player = {}
 local platforms = { {}, {} }
 local starter_platform = {}
 local latters = { {} }
--- need to fix a bug where you can't go up latter when you are standing on ground and it only lets you go up when you are already in air.
+
 function love.load()
 	-- window setup
 	love.window.setMode(800, 800)
@@ -99,7 +99,6 @@ function platformsSetup()
 end
 
 -- PLAYER
-
 function playerSetup()
 	player.width = 20
 	player.height = 60
@@ -110,6 +109,7 @@ function playerSetup()
 	player.jumpHeight = -50
 	player.isGrounded = false
 	player.onLatter = false
+	player.currentLatter = 0
 	player.latterClimbSpeed = -70
 	player.name = "player"
 	player.feetRadius = player.width / 2
@@ -156,9 +156,6 @@ function playerMovement()
 		elseif player.onLatter then
 			local vx, _ = player.body:getLinearVelocity()
 			player.body:setLinearVelocity(vx, player.latterClimbSpeed)
-			if player.isGrounded then
-				player.body:setLinearVelocity(vx, player.latterClimbSpeed)
-			end
 		end
 	else
 		if player.isGrounded == false and player.onLatter then
@@ -181,6 +178,23 @@ function playerMovement()
 		then
 			local vx, _ = player.body:getLinearVelocity()
 			player.body:setLinearVelocity(vx, 0)
+		end
+	end
+
+	if player.currentLatter ~= 0 then
+		for _, l in ipairs(latters) do
+			if l == player.currentLatter then
+				if player.body:getY() + player.height / 2 < l.body:getY() - l.height / 2 then
+					if player.body:getY() + player.height / 2 < l.body:getY() - l.height / 2 - platforms[1].height then
+						local px = player.body:getX()
+						local ly = l.body:getY() - l.height / 2
+						player.body:setPosition(px, ly - platforms[1].height - 20)
+						player.onLatter = false
+						player.inPlatform = false
+						player.currentLatter = 0
+					end
+				end
+			end
 		end
 	end
 end
@@ -255,8 +269,16 @@ function endCollision(a, b, coll)
 					end
 				end
 			end
+
 			if player.inPlatform == false or player.isGrounded == false then
 				player.onLatter = false
+				print("onLatter: " .. tostring(player.onLatter))
+				print("isGrounded: " .. tostring(player.isGrounded))
+				print("inPlatform: " .. tostring(player.inPlatform))
+				local _, vy = player.body:getLinearVelocity()
+				print("vy: " .. tostring(vy))
+				local px, _ = player.body:getLinearVelocity()
+				player.body:setLinearVelocity(px, 0)
 			end
 		end
 	end
@@ -269,6 +291,11 @@ function preSolve(a, b, coll)
 	if objA and objB then
 		-- latter check
 		if objA.name == "player" and objB.name == "latter" or objA.name == "latter" and objB.name == "player" then
+			if objA.name == "latter" then
+				player.currentLatter = objA
+			elseif objB.name == "latter" then
+				player.currentLatter = objB
+			end
 			coll:setEnabled(false)
 		end
 		-- platform checks
