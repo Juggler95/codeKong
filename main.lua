@@ -1,11 +1,11 @@
 local player = {}
-local platforms = { {}, {} }
+local platforms = { {}, {}, {}, {}, {}, {} }
 local starter_platform = {}
-local latters = { {} }
+local ladders = { {}, {}, {} }
 
 function love.load()
 	-- window setup
-	love.window.setMode(800, 800)
+	love.window.setMode(800, 850)
 	love.window.setTitle("Code Kong")
 	love.graphics.setBackgroundColor(0, 0, 1)
 
@@ -14,9 +14,9 @@ function love.load()
 	World = love.physics.newWorld(0, 9.81 * 64, true)
 	World:setCallbacks(beginCollision, endCollision, preSolve, postSolve)
 
-	-- running functions for setups
+	-- running setup functons
 	platformsSetup()
-	latterSetup()
+	ladderSetup()
 	playerSetup()
 end
 
@@ -44,8 +44,8 @@ function love.draw()
 		love.graphics.origin()
 	end
 
-	-- latters
-	for _, l in ipairs(latters) do
+	-- ladders
+	for _, l in ipairs(ladders) do
 		love.graphics.setColor(1, 1, 1)
 		love.graphics.polygon("fill", l.body:getWorldPoints(l.shape:getPoints()))
 	end
@@ -66,16 +66,22 @@ function platformsSetup()
 			p.width = love.graphics.getWidth() - love.graphics.getWidth() / 15
 		end
 		p.height = 20
-		p.groundLevel = false
 		p.name = "platform"
 	end
 	platforms[1].x = love.graphics.getWidth() / 2 + platforms[1].width / 2
 	platforms[1].y = love.graphics.getHeight() - platforms[1].height / 2 - 7
-	platforms[1].groundLevel = true
 
-	platforms[2].x = love.graphics.getWidth() / 2 - (love.graphics.getWidth() - platforms[2].width)
-	platforms[2].y = platforms[1].y - 115 - platforms[2].height / 2 - platforms[1].height / 2
+	for i = 2, #platforms, 1 do
+		local p = platforms[i]
+		if i % 2 == 0 then
+			p.x = love.graphics.getWidth() / 2 - (love.graphics.getWidth() - p.width)
+		else
+			p.x = love.graphics.getWidth() - p.width / 2
+		end
+		platforms[i].y = platforms[i - 1].y - 115 - platforms[i].height / 2 - platforms[i - 1].height / 2
+	end
 
+	-- physics logic
 	for _, p in ipairs(platforms) do
 		p.body = love.physics.newBody(World, p.x, p.y, "static")
 		p.body:setAngle(math.rad(p.angle))
@@ -103,14 +109,13 @@ function playerSetup()
 	player.width = 20
 	player.height = 60
 	player.starting_x = 40
-	-- player.starting_y = 500
 	player.starting_y = love.graphics.getHeight() - starter_platform.height - player.height / 2
 	player.speed = 200
 	player.jumpHeight = -50
 	player.isGrounded = false
 	player.onLatter = false
 	player.currentLatter = 0
-	player.latterClimbSpeed = -70
+	player.ladderClimbSpeed = -70
 	player.name = "player"
 	player.feetRadius = player.width / 2
 	player.inPlatform = false
@@ -139,6 +144,7 @@ function playerMovement()
 		player.body:setLinearVelocity(0, vy)
 	end
 
+	-- latter gravity logic
 	if player.onLatter == true then
 		player.body:setGravityScale(0)
 	else
@@ -152,10 +158,10 @@ function playerMovement()
 				player.isGrounded = false
 			end
 
-		-- latter movement
+		-- ladder movement
 		elseif player.onLatter then
 			local vx, _ = player.body:getLinearVelocity()
-			player.body:setLinearVelocity(vx, player.latterClimbSpeed)
+			player.body:setLinearVelocity(vx, player.ladderClimbSpeed)
 		end
 	else
 		if player.isGrounded == false and player.onLatter then
@@ -164,10 +170,11 @@ function playerMovement()
 		end
 	end
 
+	-- down movement on latter
 	if love.keyboard.isDown("s") then
 		if player.onLatter then
 			local vx, _ = player.body:getLinearVelocity()
-			player.body:setLinearVelocity(vx, player.latterClimbSpeed * -1)
+			player.body:setLinearVelocity(vx, player.ladderClimbSpeed * -1)
 		end
 	else
 		if
@@ -181,8 +188,9 @@ function playerMovement()
 		end
 	end
 
+	-- Logic for making it so you don't keep flying when you leave the top of the latter
 	if player.currentLatter ~= 0 then
-		for _, l in ipairs(latters) do
+		for _, l in ipairs(ladders) do
 			if l == player.currentLatter then
 				if player.body:getY() + player.height / 2 < l.body:getY() - l.height / 2 then
 					if player.body:getY() + player.height / 2 < l.body:getY() - l.height / 2 - platforms[1].height then
@@ -199,27 +207,47 @@ function playerMovement()
 	end
 end
 
--- LATTERS
-function latterSetup()
-	local lat = latters
+-- LADDERS
+function ladderSetup()
+	local lad = ladders
 
-	lat[1].small = true
+	lad[1].small = true
+	lad[2].small = true
+	lad[3].small = true
 
-	for _, l in ipairs(lat) do
+	for _, l in ipairs(lad) do
 		l.width = 15
-		l.name = "latter"
+		l.name = "ladder"
 		if l.small == true then
-			l.height = 100
+			l.height = 93
 		else
 			l.height = 120
 		end
 	end
 
-	lat[1].x = love.graphics.getWidth() - 100 - lat[1].width / 2
-	lat[1].y = love.graphics.getHeight() - platforms[1].height / 2 - lat[1].height / 2 - platforms[1].height
+	-- creating small ladders
+	lad[1].height = 100
+	lad[1].x = love.graphics.getWidth() - 100 - lad[1].width / 2
+	lad[1].y = love.graphics.getHeight() - platforms[1].height / 2 - lad[1].height / 2 - platforms[1].height
+
+	for i = 2, #ladders do
+		if ladders[i].small == true then
+			local l = ladders
+			local p = platforms
+			if i % 2 ~= 0 then
+				l[i].x = love.graphics.getWidth() - 100 - l[i].width / 2
+        -- + 2 is just a small offset to visualy align better because of the angle of the platforms
+				l[i].y = (p[i + 1].y + p[i].y) / 2 + 2
+			else
+				l[i].x = l[i].width / 2 + 100
+        -- + 2 is just a small offset to visualy align better because of the angle of the platforms
+				l[i].y = (p[i + 1].y + p[i].y) / 2 + 2
+			end
+		end
+	end
 
 	-- physics setup
-	for _, l in ipairs(lat) do
+	for _, l in ipairs(lad) do
 		l.body = love.physics.newBody(World, l.x, l.y, "static")
 		l.shape = love.physics.newRectangleShape(l.width, l.height)
 		l.fixture = love.physics.newFixture(l.body, l.shape)
@@ -234,14 +262,14 @@ function beginCollision(a, b, coll)
 	local objB = b:getUserData()
 	if objA and objB then
 		if objA.name == "player" and objB.name == "platform" then
-			objB.isGrounded = true
+			objA.isGrounded = true
 		elseif objA.name == "platform" and objB.name == "player" then
 			objB.isGrounded = true
 		end
 
-		if objA.name == "player" and objB.name == "latter" then
+		if objA.name == "player" and objB.name == "ladder" then
 			objA.onLatter = true
-		elseif objA.name == "latter" and objB.name == "player" then
+		elseif objA.name == "ladder" and objB.name == "player" then
 			objB.onLatter = true
 		end
 	end
@@ -257,7 +285,7 @@ function endCollision(a, b, coll)
 			objB.isGrounded = false
 		end
 
-		if objA.name == "player" and objB.name == "latter" or objA.name == "latter" and objB.name == "player" then
+		if objA.name == "player" and objB.name == "ladder" or objA.name == "ladder" and objB.name == "player" then
 			player.inPlatform = false
 			for _, p in ipairs(platforms) do
 				if objA.name == "player" or objB.name == "player" then
@@ -272,11 +300,6 @@ function endCollision(a, b, coll)
 
 			if player.inPlatform == false or player.isGrounded == false then
 				player.onLatter = false
-				print("onLatter: " .. tostring(player.onLatter))
-				print("isGrounded: " .. tostring(player.isGrounded))
-				print("inPlatform: " .. tostring(player.inPlatform))
-				local _, vy = player.body:getLinearVelocity()
-				print("vy: " .. tostring(vy))
 				local px, _ = player.body:getLinearVelocity()
 				player.body:setLinearVelocity(px, 0)
 			end
@@ -289,11 +312,11 @@ function preSolve(a, b, coll)
 	local objB = b:getUserData()
 
 	if objA and objB then
-		-- latter check
-		if objA.name == "player" and objB.name == "latter" or objA.name == "latter" and objB.name == "player" then
-			if objA.name == "latter" then
+		-- ladder check
+		if objA.name == "player" and objB.name == "ladder" or objA.name == "ladder" and objB.name == "player" then
+			if objA.name == "ladder" then
 				player.currentLatter = objA
-			elseif objB.name == "latter" then
+			elseif objB.name == "ladder" then
 				player.currentLatter = objB
 			end
 			coll:setEnabled(false)
