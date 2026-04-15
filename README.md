@@ -15,7 +15,12 @@ then inside of the projects directory on your system you can run `love .` to pla
 I am currently working on finishing up all of the differnt kinds of ladders
 
 #### Features still coming:
-- main enemy
-- enemy's coming down the screen (like barrles in the original)
-- the other levels from the original game
-- scoring and highscore systems
+
+- Main boss enemy(like Donkey Kong)
+- Enemy's coming down the screen (like barrles in the original)
+- The other levels from the original game
+- Custom Art
+- Scoring and highscore systems
+
+#### known bugs:
+- launching off of varied ladder
