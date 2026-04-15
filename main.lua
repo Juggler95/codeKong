@@ -1,7 +1,7 @@
 local player = {}
 local platforms = { {}, {}, {}, {}, {}, {} }
 local starter_platform = {}
-local ladders = { {}, {}, {} }
+local smallLadders = { {}, {}, {}, {}, {} }
 
 function love.load()
 	-- window setup
@@ -45,7 +45,7 @@ function love.draw()
 	end
 
 	-- ladders
-	for _, l in ipairs(ladders) do
+	for _, l in ipairs(smallLadders) do
 		love.graphics.setColor(1, 1, 1)
 		love.graphics.polygon("fill", l.body:getWorldPoints(l.shape:getPoints()))
 	end
@@ -190,16 +190,24 @@ function playerMovement()
 
 	-- Logic for making it so you don't keep flying when you leave the top of the latter
 	if player.currentLatter ~= 0 then
-		for _, l in ipairs(ladders) do
+		for _, l in ipairs(smallLadders) do
 			if l == player.currentLatter then
+				-- checks if the players feet are above the current ladders top
 				if player.body:getY() + player.height / 2 < l.body:getY() - l.height / 2 then
+					-- checks if the players feet are above the platform above the current ladder
 					if player.body:getY() + player.height / 2 < l.body:getY() - l.height / 2 - platforms[1].height then
 						local px = player.body:getX()
 						local ly = l.body:getY() - l.height / 2
+
 						player.body:setPosition(px, ly - platforms[1].height - 20)
+						-- reset data for after the telaport
 						player.onLatter = false
 						player.inPlatform = false
 						player.currentLatter = 0
+					else
+						-- puts the players x to the same as the center of the current ladder so they can't skip ahead by choicing where to get onto the ladder.
+						local x = l.body:getX()
+						player.body:setPosition(x, player.body:getY())
 					end
 				end
 			end
@@ -209,45 +217,35 @@ end
 
 -- LADDERS
 function ladderSetup()
-	local lad = ladders
+	local sLad = smallLadders
 
-	lad[1].small = true
-	lad[2].small = true
-	lad[3].small = true
-
-	for _, l in ipairs(lad) do
+	for _, l in ipairs(sLad) do
 		l.width = 15
 		l.name = "ladder"
-		if l.small == true then
-			l.height = 93
-		else
-			l.height = 120
-		end
+		l.height = 94
 	end
 
 	-- creating small ladders
-	lad[1].height = 100
-	lad[1].x = love.graphics.getWidth() - 100 - lad[1].width / 2
-	lad[1].y = love.graphics.getHeight() - platforms[1].height / 2 - lad[1].height / 2 - platforms[1].height
+	sLad[1].height = 100
+	sLad[1].x = love.graphics.getWidth() - 100 - sLad[1].width / 2
+	sLad[1].y = love.graphics.getHeight() - platforms[1].height / 2 - sLad[1].height / 2 - platforms[1].height
 
-	for i = 2, #ladders do
-		if ladders[i].small == true then
-			local l = ladders
-			local p = platforms
-			if i % 2 ~= 0 then
-				l[i].x = love.graphics.getWidth() - 100 - l[i].width / 2
-        -- + 2 is just a small offset to visualy align better because of the angle of the platforms
-				l[i].y = (p[i + 1].y + p[i].y) / 2 + 2
-			else
-				l[i].x = l[i].width / 2 + 100
-        -- + 2 is just a small offset to visualy align better because of the angle of the platforms
-				l[i].y = (p[i + 1].y + p[i].y) / 2 + 2
-			end
+	for i = 2, #smallLadders do
+		local l = smallLadders
+		local p = platforms
+		if i % 2 ~= 0 then
+			l[i].x = love.graphics.getWidth() - 100 - l[i].width / 2
+			-- + 2 is just a small offset to visualy align better because of the angle of the platforms
+			l[i].y = (p[i + 1].y + p[i].y) / 2 + 2
+		else
+			l[i].x = l[i].width / 2 + 100
+			-- + 2 is just a small offset to visualy align better because of the angle of the platforms
+			l[i].y = (p[i + 1].y + p[i].y) / 2 + 2
 		end
 	end
 
 	-- physics setup
-	for _, l in ipairs(lad) do
+	for _, l in ipairs(sLad) do
 		l.body = love.physics.newBody(World, l.x, l.y, "static")
 		l.shape = love.physics.newRectangleShape(l.width, l.height)
 		l.fixture = love.physics.newFixture(l.body, l.shape)
