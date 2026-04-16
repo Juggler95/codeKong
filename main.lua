@@ -163,9 +163,9 @@ function playerMovement()
 
 	if love.keyboard.isDown("space") or love.keyboard.isDown("w") then
 		if not player.onLadder then
-			if player.isGrounded then
-				player.body:applyLinearImpulse(0, player.jumpHeight)
+			if player.isGrounded and not player.inPlatform then
 				player.isGrounded = false
+				player.body:applyLinearImpulse(0, player.jumpHeight)
 			end
 
 		-- ladder movement
@@ -213,8 +213,12 @@ function noFly(ladders)
 					-- checks if the players feet are above the platform above the current ladder
 					if player.body:getY() + player.height / 2 < l.body:getY() - l.height / 2 - platforms[1].height then
 						local px = player.body:getX()
-						local ly = l.body:getY() - l.height / 2
-							player.body:setPosition(px, ly - platforms[1].height - 20)
+						-- local ly = l.body:getY() - l.height / 2
+						-- player.body:setPosition(px, ly - platforms[1].height - 20)
+						local ly = l.targetPlatform
+						if player.inPlatform == false then
+							player.body:setPosition(px, ly)
+						end
 
 						-- reset data for after the telaport
 						player.onLadder = false
@@ -246,6 +250,10 @@ function ladderSetup()
 	sLad[1].x = love.graphics.getWidth() - 100 - sLad[1].width / 2
 	sLad[1].y = love.graphics.getHeight() - platforms[1].height / 2 - sLad[1].height / 2 - platforms[1].height
 
+	for i = 1, #sLad do
+		sLad[i].targetPlatform = platforms[i + 1].body:getY() - platforms[i + 1].height / 2
+	end
+
 	for i = 2, #smallLadders do
 		local l = smallLadders
 		local p = platforms
@@ -261,14 +269,15 @@ function ladderSetup()
 	end
 
 	-- creating the variety ladders
-	local varLad = varietyLadders
-	for _, l in ipairs(varLad) do
+	local vl = varietyLadders
+	for _, l in ipairs(vl) do
 		l.width = 15
 		l.name = "ladder"
 	end
-	varLad[1].height = 117
-	varLad[1].x = love.graphics.getWidth() / 2
-	varLad[1].y = platforms[2].y - platforms[2].height / 2 - varLad[1].height / 2 + 2
+	vl[1].height = 115
+	vl[1].x = love.graphics.getWidth() / 2
+	vl[1].y = platforms[2].y - platforms[2].height / 2 - vl[1].height / 2
+	vl[1].targetPlatform = platforms[3].body:getY() - platforms[3].height / 2 - 20
 
 	-- physics setup for small ladders
 	for _, t in ipairs(ladderTypes) do
@@ -283,7 +292,6 @@ end
 
 -- COLLISION
 function beginCollision(a, b, coll)
-	-- used claude to understand how this function works
 	local objA = a:getUserData()
 	local objB = b:getUserData()
 	if objA and objB then
