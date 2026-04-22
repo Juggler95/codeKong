@@ -12,7 +12,7 @@ then inside of the projects directory on your system you can run `love .` to pla
 
 #### Currently Working On
 
-I am currently working on finishing up all of the differnt kinds of ladders
+Currently working and adding the other ladders that are not just on the edges.
 
 #### Features still coming:
 
@@ -23,4 +23,3 @@ I am currently working on finishing up all of the differnt kinds of ladders
 - Scoring and highscore systems
 
 #### known bugs:
-- launching off of varied ladder

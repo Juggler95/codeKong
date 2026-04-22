@@ -1,11 +1,11 @@
 local player = {}
 local platforms = { {}, {}, {}, {}, {}, {} }
 local edgeLadders = {
-	{ abovePlatform = 2 },
-	{ abovePlatform = 3 },
-	{ abovePlatform = 4 },
-	{ abovePlatform = 5 },
-	{ abovePlatform = 6 },
+	{ abovePlatform = platforms[2] },
+	{ abovePlatform = platforms[3] },
+	{ abovePlatform = platforms[4] },
+	{ abovePlatform = platforms[5] },
+	{ abovePlatform = platforms[6] },
 }
 local variedLadders = {}
 local ladderTypes = { edgeLadders, variedLadders }
@@ -67,7 +67,7 @@ function PlayerSetup()
 	local p = player
 	local groundLevel = platforms[1]
 	-- transform
-	p.height = 80
+	p.height = 60
 	p.width = 20
 	p.starting_x = 30
 	p.starting_y = groundLevel.y - PLATFORM_HEIGHT / 2 - p.height / 2
@@ -75,7 +75,7 @@ function PlayerSetup()
 
 	-- movement
 	p.speed = 200
-	p.jumpHeight = -60
+	p.jumpHeight = -50
 	p.climbSpeed = -70
 
 	-- logic
@@ -83,6 +83,8 @@ function PlayerSetup()
 	p.isGrounded = true
 	p.onLadder = false
 	p.currentLadder = 0
+	p.canJump = true
+	p.groundTimer = 0
 	p.lives = 3
 
 	-- physics setup
@@ -130,15 +132,13 @@ function LadderMovement(direction)
 	local p = player
 	if p.onLadder then
 		local px, _ = p.body:getLinearVelocity()
-		p.isGrouned = false
+		p.isGrounded = false
 		if direction == "up" then
 			p.body:setLinearVelocity(px, p.climbSpeed)
 		elseif direction == "down" then
 			p.body:setLinearVelocity(px, p.climbSpeed * -1)
 		end
-	elseif p.onLadder and p.isGrounded == false then
-		local px, _ = p.body:getLinearVelocity()
-		p.body:setLinearVelocity(px, 0)
+		-- claude found I had a dead elseif branch here. I removed it
 	end
 end
 
@@ -183,6 +183,20 @@ function love.update(dt)
 	World:update(dt)
 
 	PlayerMovement()
+	if player.currentLadder ~= 0 and player.onLadder then
+		inPlatformCheck(player, player.currentLadder)
+	end
+
+	-- claude helped me figure out timer logic
+	-- gives the player a delay after coming through a platform where they can't jump so they don't jump right when coming out of ladder and looking like they get launched
+	if not player.canJump then
+		player.groundTimer = player.groundTimer + dt
+		if player.groundTimer >= 0.1 then
+			player.groundTimer = 0
+			player.isGrounded = true
+			player.canJump = true
+		end
+	end
 end
 
 function love.draw()
@@ -215,7 +229,7 @@ function love.keyreleased(key)
 	elseif key == "d" or key == "a" then
 		local _, py = player.body:getLinearVelocity()
 		player.body:setLinearVelocity(0, py)
-	-- this fixes a issue with ladder of you not stoping on the ladder when you aren't holding one of the keys
+	-- this fixes a issue with ladders of the player not stoping on the ladder when you aren't holding any movement keys
 	elseif key == "w" or key == "space" or key == "s" then
 		if player.onLadder then
 			local px, _ = player.body:getLinearVelocity()
@@ -254,10 +268,31 @@ function endCollision(a, b, coll)
 		end
 
 		if objA.name == "player" and objB.name == "ladder" then
-			objA.onLadder = false
+			inPlatformCheck(objA, objB)
 		elseif objA.name == "ladder" and objB.name == "player" then
-			objB.onLadder = false
+			inPlatformCheck(objB, objA)
 		end
+	end
+end
+
+function inPlatformCheck(p, l)
+	local pl = l.abovePlatform
+	p.inPlatform = false
+	if
+		p.body:getY() + p.height / 2 > pl.body:getY() - PLATFORM_HEIGHT / 2
+		and p.body:getY() - p.height / 2 < pl.body:getY() + PLATFORM_HEIGHT / 2
+		and p.onLadder
+	then
+		p.inPlatform = true
+	end
+	if p.body:getY() + p.height / 2 < pl.body:getY() - PLATFORM_HEIGHT / 2 then
+		p.isGrounded = false
+		p.onLadder = false
+		p.groundTimer = 0
+		p.canJump = false
+		player.currentLadder = 0
+		local px, _ = player.body:getLinearVelocity()
+		player.body:setLinearVelocity(px, 0)
 	end
 end
 
@@ -273,6 +308,32 @@ function preSolve(a, b, coll)
 			end
 			coll:setEnabled(false)
 		end
+		-- platform checks
+		if objA.name == "player" and objB.name == "platform" then
+			PlatformAboveLogic(objA, objB, coll)
+		elseif objA.name == "platform" and objB.name == "player" then
+			PlatformAboveLogic(objB, objA, coll)
+		end
+	end
+end
+
+function PlatformAboveLogic(player, platform, coll)
+	local p = player
+	local pl = platform
+	local l = p.currentLadder
+
+	if l == 0 then
+		return
+	elseif pl ~= l.abovePlatform then
+		return
+	elseif not p.onLadder then
+		return
+	end
+
+	if p.body:getY() + p.height / 2 > pl.body:getY() - PLATFORM_HEIGHT / 2 then
+		coll:setEnabled(false)
+	else
+		coll:setEnabled(true)
 	end
 end
 
