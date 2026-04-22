@@ -23,3 +23,5 @@ Currently working and adding the other ladders that are not just on the edges.
 - Scoring and highscore systems
 
 #### known bugs:
+
+when going up through platforms you can stop half way and just move on the x axis inside of the platforms and then if you hit another ladder when in platform you can fly.
