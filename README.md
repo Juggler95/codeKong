@@ -12,6 +12,7 @@ then inside of the projects directory on your system you can run `love .` to pla
 
 #### Currently Working On
 
+enemy logic
 
 #### Features still coming:
 

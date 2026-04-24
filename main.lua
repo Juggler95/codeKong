@@ -12,6 +12,8 @@ local variedLadders =
 local ladderTypes = { edgeLadders, variedLadders }
 local barriers = { {}, {} }
 
+local enemies = { {} }
+
 -- globals
 PLATFORM_HEIGHT = 20
 
@@ -98,7 +100,7 @@ function PlayerSetup()
 	p.radius = p.width / 2
 
 	-- movement
-	p.speed = 200
+	p.speed = 150
 	p.jumpHeight = -50
 	p.climbSpeed = -70
 	p.canJump = true
@@ -179,6 +181,12 @@ function LadderSetup()
 				l.fixture:setUserData(l)
 			end
 		end
+	end
+end
+
+function EnemySetup()
+	for e in ipairs(enemies) do
+		e.name = "enemy"
 	end
 end
 
@@ -288,7 +296,6 @@ function love.draw()
 end
 
 -- collision
-
 function beginCollision(a, b, coll)
 	local objA = a:getUserData()
 	local objB = b:getUserData()
