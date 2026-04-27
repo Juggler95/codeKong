@@ -12,7 +12,8 @@ local variedLadders =
 local ladderTypes = { edgeLadders, variedLadders }
 local barriers = { {}, {} }
 
-local enemies = { {} }
+local enemies = {}
+SpawnEnemyTimer = 0
 
 -- globals
 PLATFORM_HEIGHT = 20
@@ -184,10 +185,21 @@ function LadderSetup()
 	end
 end
 
-function EnemySetup()
-	for e in ipairs(enemies) do
-		e.name = "enemy"
-	end
+function SpawnEnemy()
+	local enemy = {}
+
+	enemy.width = 30
+	enemy.height = 20
+	enemy.starting_x = 100
+	enemy.starting_y = platforms[#platforms].y - PLATFORM_HEIGHT / 2 - enemy.height / 2
+
+	enemy.body = love.physics.newBody(World, enemy.starting_x, enemy.starting_y, "dynamic")
+	enemy.shape = love.physics.newRectangleShape(enemy.width, enemy.height)
+	enemy.fixture = love.physics.newFixture(enemy.body, enemy.shape)
+	enemy.fixture:setUserData(enemy)
+
+	table.insert(enemies, enemy)
+	SpawnEnemeyTimer = 0
 end
 
 -- MOVEMENT
@@ -269,6 +281,12 @@ function love.update(dt)
 			player.canJump = true
 		end
 	end
+
+	SpawnEnemyTimer = SpawnEnemyTimer + dt
+	if SpawnEnemyTimer >= 5 then
+		SpawnEnemyTimer = 0
+		SpawnEnemy()
+	end
 end
 
 function love.draw()
@@ -288,9 +306,18 @@ function love.draw()
 	for _, t in ipairs(ladderTypes) do
 		for __, l in ipairs(t) do
 			if l then
-				love.graphics.setColor(0, 1, 0)
+        -- used claude to help me find a aqua color and how to convert 255 rgb values to how lua does color
+				love.graphics.setColor(0, 200 / 255, 220 / 255)
 				love.graphics.polygon("fill", l.body:getWorldPoints(l.shape:getPoints()))
 			end
+		end
+	end
+
+	-- enemys
+	for _, e in ipairs(enemies) do
+		if e then
+			love.graphics.setColor(1, 0, 0)
+			love.graphics.polygon("fill", e.body:getWorldPoints(e.shape:getPoints()))
 		end
 	end
 end
