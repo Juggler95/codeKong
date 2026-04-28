@@ -12,7 +12,7 @@ then inside of the projects directory on your system you can run `love .` to pla
 
 #### Currently Working On
 
-enemy logic
+enemy scoring logic
 
 #### Features still coming:
 
@@ -23,3 +23,5 @@ enemy logic
 - Scoring and highscore systems
 
 #### known bugs:
+
+dying when jumping over enemy through scoring sensor
