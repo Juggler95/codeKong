@@ -12,8 +12,6 @@ then inside of the projects directory on your system you can run `love .` to pla
 
 #### Currently Working On
 
-enemy scoring logic
-
 #### Features still coming:
 
 - Main boss enemy(like Donkey Kong)
@@ -23,5 +21,3 @@ enemy scoring logic
 - Scoring and highscore systems
 
 #### known bugs:
-
-dying when jumping over enemy through scoring sensor
