@@ -1,4 +1,5 @@
 local player = {}
+
 local platforms = { {}, {}, {}, {}, {}, {} }
 local edgeLadders = {
 	{ abovePlatform = platforms[2] },
@@ -21,9 +22,18 @@ SpawnEnemyTimer = 0
 PLATFORM_HEIGHT = 20
 SCORE = 0
 
+-- ui
+local font = love.graphics.newFont(24)
+
+-- catagorys look up
+-- 2 = standard enemy state
+-- 5 = enemy ladder state
+-- 4 = enemy climb down ladder sensor
+-- 16 I just use this one when reseting a mask
+
 function love.load()
 	-- window setup
-	love.window.setMode(800, 900)
+	love.window.setMode(800, 1000)
 	love.window.setTitle("Code Kong")
 	love.graphics.setBackgroundColor(0, 0, 0)
 
@@ -31,6 +41,8 @@ function love.load()
 	love.physics.setMeter(64)
 	World = love.physics.newWorld(0, 9.81 * 64, true)
 	World:setCallbacks(beginCollision, endCollision, preSolve, postSolve)
+
+	math.randomseed(os.time())
 
 	BarrierSetup()
 	PlatformSetup()
@@ -128,6 +140,8 @@ function PlayerSetup()
 	p.feetFixture = love.physics.newFixture(p.body, p.feetCollider)
 	p.bodyFixture:setUserData(p)
 	p.feetFixture:setUserData(p)
+	p.bodyFixture:setMask(4)
+	p.feetFixture:setMask(4)
 
 	-- claude code told me about the setFriction function
 	-- this is just preventing the player from sticking to the side of the platforms/barriers
@@ -184,7 +198,14 @@ function LadderSetup()
 				l.shape = love.physics.newRectangleShape(l.width, l.height)
 				l.fixture = love.physics.newFixture(l.body, l.shape)
 				l.fixture:setUserData(l)
-				l.fixture:setMask(2)
+				l.fixture:setMask(2, 5)
+
+				l.climbDownShape =
+					love.physics.newRectangleShape(0, -l.height / 2 - PLATFORM_HEIGHT / 2 - 20, l.width, 20)
+				l.climbDownFixture = love.physics.newFixture(l.body, l.climbDownShape)
+				l.climbDownFixture:setCategory(4)
+				l.climbDownFixture:setUserData(l)
+				l.climbDownFixture:setSensor(true)
 			end
 		end
 	end
@@ -194,14 +215,21 @@ end
 function SpawnEnemy()
 	local e = {}
 	enemyCount = enemyCount + 1
+	e.name = "enemy"
 
+	-- transform
 	e.width = 30
 	e.height = 20
 	e.starting_x = 100
 	e.starting_y = platforms[#platforms].y - PLATFORM_HEIGHT / 2 - e.height / 2
-	e.isRight = true
+
+	-- logic
 	e.speed = 150
-	e.name = "enemy"
+	e.isRight = true
+	e.climbLadderChance = 8
+	e.canMove = true
+	e.onLadder = false
+	e.currentLadder = 0
 
 	e.body = love.physics.newBody(World, e.starting_x, e.starting_y, "dynamic")
 	e.body:setFixedRotation(true)
@@ -210,7 +238,10 @@ function SpawnEnemy()
 	e.fixture = love.physics.newFixture(e.body, e.shape)
 	e.fixture:setUserData(e)
 	e.fixture:setCategory(2)
+	e.fixture:setMask(2, 5)
 	e.fixture:setFriction(0)
+
+	-- Scoring Sensor logic
 	-- claude helped found I had a typo here saying scoringFixture where I had in the damage check scoringSensor
 	e.scoringSensor = love.physics.newFixture(e.body, e.scoringShape)
 	e.scoringSensor:setUserData(e)
@@ -335,9 +366,12 @@ function love.update(dt)
 		SpawnEnemy()
 	end
 
+	-- enemy movement
 	if enemyCount >= 1 then
 		for _, e in ipairs(enemies) do
-			EnemyMovement(e)
+			if e.canMove then
+				EnemyMovement(e)
+			end
 		end
 	end
 
@@ -377,6 +411,10 @@ function love.draw()
 			love.graphics.polygon("fill", e.body:getWorldPoints(e.shape:getPoints()))
 		end
 	end
+	-- ui
+	love.graphics.setColor(1, 1, 1)
+	love.graphics.print("Score: " .. tostring(SCORE), font, 10, 0)
+	love.graphics.print("Lives: " .. tostring(player.lives), font, 10, 40)
 end
 
 -- collision
@@ -403,35 +441,82 @@ function beginCollision(a, b, coll)
 			objB.isRight = not objB.isRight
 		end
 
+		-- enemy ladder logic
+		if objA.name == "enemy" and objB.name == "ladder" then
+			if b == objB.climbDownFixture then
+				EnemyLadderLogic(objA, objB)
+			end
+		elseif objA.name == "ladder" and objB.name == "enemy" then
+			if a == objA.climbDownFixture then
+				EnemyLadderLogic(objB, objA)
+			end
+		end
+
+		-- enemy stop moving on ladder logic
+		if objA.name == "enemy" and objB.name == "platform" then
+			local e = objA
+			local l = e.currentLadder
+			if l ~= 0 then
+				local pl = l.abovePlatform
+				if e.body:getY() + e.height / 2 >= l.body:getY() + l.height / 2 - 5 then
+					e.body:setGravityScale(1)
+					e.canMove = true
+					e.fixture:setCategory(2)
+					pl.fixture:setMask(16)
+				end
+			end
+		elseif objB.name == "enemy" and objA.name == "platform" then
+			local e = objB
+			local l = e.currentLadder
+			if l ~= 0 then
+				local pl = l.abovePlatform
+				if e.body:getY() + e.height / 2 >= l.body:getY() + l.height / 2 - 5 then
+					e.body:setGravityScale(1)
+					e.canMove = true
+					e.fixture:setCategory(2)
+					pl.fixture:setMask(16)
+				end
+			end
+		end
+
 		-- damage check
 		if objA.name == "player" and objB.name == "enemy" then
-			print(tostring(a))
-			print(tostring(b))
-			print(tostring(objA.scoringSensor))
 			if b == objB.scoringSensor then
 				if not objA.onLadder then
 					SCORE = SCORE + 100
-					print(SCORE)
 				end
 			else
-				print("damage! playerY: " .. player.body:getY() .. " enemyY: " .. objB.body:getY())
 				objA.lives = objA.lives - 1
 				objA.tookDamage = true
 			end
 		elseif objA.name == "enemy" and objB.name == "player" then
-			print(tostring(a))
-			print(tostring(b))
-			print(tostring(objA.scoringSensor))
 			if a == objA.scoringSensor then
 				if not objB.onLadder then
-				SCORE = SCORE + 100
-				print(SCORE)
-        end
+					SCORE = SCORE + 100
+				end
 			else
-				print("damage! playerY: " .. player.body:getY() .. " enemyY: " .. objB.body:getY())
 				objB.lives = objB.lives - 1
 				objB.tookDamage = true
 			end
+		end
+	end
+end
+
+function EnemyLadderLogic(e, l)
+	local randNum = math.random(1, e.climbLadderChance)
+	if randNum == 1 then
+		local p = l.abovePlatform
+		e.canMove = false
+		e.isRight = not e.isRight
+		e.fixture:setCategory(5)
+		p.fixture:setMask(5)
+		e.climbLadderChance = 8
+		e.body:setGravityScale(0)
+		e.body:setLinearVelocity(0, 50)
+		e.currentLadder = l
+	else
+		if math.random(1, 2) == 1 then
+			e.climbLadderChance = e.climbLadderChance - 1
 		end
 	end
 end
