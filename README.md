@@ -14,10 +14,12 @@ then inside of the projects directory on your system you can run `love .` to pla
 
 #### Features still coming:
 
-- Main boss enemy(like Donkey Kong)
-- Enemy's coming down the screen (like barrles in the original)
-- The other levels from the original game
-- Custom Art
-- Scoring and highscore systems
+- [] Main boss enemy(like Donkey Kong)
+- [x] Enemy's coming down the screen (like barrles in the original)
+- [] The other levels from the original game
+- [] Custom Art
+- [] Highscore systems
 
 #### known bugs:
+
+enemies sometimes freeze

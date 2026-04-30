@@ -1,6 +1,18 @@
+-- globals
+PLATFORM_HEIGHT = 20
+SCORE = 0
+LEVEL = 1
+
+-- player
 local player = {}
 
+-- keyboard(hammer)
+local keyboards = { {}, {} }
+
+-- platforms
 local platforms = { {}, {}, {}, {}, {}, {} }
+
+-- ladders
 local edgeLadders = {
 	{ abovePlatform = platforms[2] },
 	{ abovePlatform = platforms[3] },
@@ -11,16 +23,17 @@ local edgeLadders = {
 local variedLadders =
 	{ { abovePlatform = platforms[3] }, { abovePlatform = platforms[4] }, { abovePlatform = platforms[5] } }
 local ladderTypes = { edgeLadders, variedLadders }
+
+-- barriers
 local barriers = { {}, {} }
 
+-- enemy
 local enemies = {}
-local enemyCount = 0
+-- local enemyCount = 0
 local randomEnemySpawnInterval = 2
-SpawnEnemyTimer = 0
-
--- globals
-PLATFORM_HEIGHT = 20
-SCORE = 0
+local randomEnemySpawnIntervalLowerBounds = 2
+local randomEnemySpawnIntervalUpperBounds = 7
+local spawnEnemyTimer = 0
 
 -- ui
 local font = love.graphics.newFont(24)
@@ -48,6 +61,7 @@ function love.load()
 	PlatformSetup()
 	LadderSetup()
 	PlayerSetup()
+	KeyboardItemSetup()
 end
 
 -- Setup Functions
@@ -211,10 +225,35 @@ function LadderSetup()
 	end
 end
 
+function KeyboardItemSetup()
+	for _, k in ipairs(keyboards) do
+		k.name = "keyboard"
+		k.height = 50
+		k.width = 20
+	end
+	local k = keyboards
+	local pl = platforms
+	k[1].x = love.graphics.getWidth() - 200
+	k[1].y = pl[2].body:getY() - PLATFORM_HEIGHT / 2 - k[1].height / 2 - 60
+
+	k[2].x = 200
+	k[2].y = pl[5].body:getY() - PLATFORM_HEIGHT / 2 - k[2].height / 2 - 60
+
+	for _, key in ipairs(keyboards) do
+		key.body = love.physics.newBody(World, key.x, key.y, "static")
+		key.shape = love.physics.newRectangleShape(key.width, key.height)
+		key.fixture = love.physics.newFixture(key.body, key.shape)
+		key.fixture:setUserData(key)
+		key.fixture:setCategory(6)
+		key.fixture:setSensor(true)
+		key.fixture:setMask(2, 4, 5)
+	end
+end
+
 -- enemy setup
 function SpawnEnemy()
 	local e = {}
-	enemyCount = enemyCount + 1
+	-- enemyCount = enemyCount + 1
 	e.name = "enemy"
 
 	-- transform
@@ -248,7 +287,7 @@ function SpawnEnemy()
 	e.scoringSensor:setSensor(true)
 
 	table.insert(enemies, e)
-	SpawnEnemeyTimer = 0
+	spawnEnemyTimer = 0
 end
 
 function ResetLocationsOnDamage()
@@ -262,8 +301,13 @@ function ResetLocationsOnDamage()
 		e[i].body:destroy()
 		e[i] = nil
 	end
-	enemyCount = 0
+	-- enemyCount = 0
 	randomEnemySpawnInterval = 3
+	randomEnemySpawnIntervalLowerBounds = 2
+	randomEnemySpawnIntervalUpperBounds = 6
+	p.currentLadder = 0
+	p.onLadder = false
+	p.isGrounded = true
 end
 
 -- MOVEMENT
@@ -359,15 +403,24 @@ function love.update(dt)
 		end
 	end
 
-	SpawnEnemyTimer = SpawnEnemyTimer + dt
-	if SpawnEnemyTimer >= randomEnemySpawnInterval then
-		SpawnEnemyTimer = 0
-		randomEnemySpawnInterval = math.random(2, 5)
+	spawnEnemyTimer = spawnEnemyTimer + dt
+	if spawnEnemyTimer >= randomEnemySpawnInterval then
+		spawnEnemyTimer = 0
+		if #enemies % 5 == 0 then
+			if randomEnemySpawnIntervalUpperBounds >= 3 then
+				randomEnemySpawnIntervalUpperBounds = randomEnemySpawnIntervalUpperBounds - 1
+			else
+				if randomEnemySpawnIntervalLowerBounds >= 2 then
+					randomEnemySpawnIntervalLowerBounds = randomEnemySpawnIntervalLowerBounds - 1
+				end
+			end
+		end
+		randomEnemySpawnInterval = math.random(randomEnemySpawnIntervalLowerBounds, randomEnemySpawnIntervalUpperBounds)
 		SpawnEnemy()
 	end
 
 	-- enemy movement
-	if enemyCount >= 1 then
+	if #enemies >= 1 then
 		for _, e in ipairs(enemies) do
 			if e.canMove then
 				EnemyMovement(e)
@@ -376,7 +429,7 @@ function love.update(dt)
 	end
 
 	-- center enemy on ladders
-	if enemyCount >= 1 then
+	if #enemies >= 1 then
 		for _, e in ipairs(enemies) do
 			if e.currentLadder ~= 0 then
 				local l = e.currentLadder
@@ -421,6 +474,13 @@ function love.draw()
 		if e then
 			love.graphics.setColor(1, 0, 0)
 			love.graphics.polygon("fill", e.body:getWorldPoints(e.shape:getPoints()))
+		end
+	end
+	-- keyboards
+	for _, k in ipairs(keyboards) do
+		if k then
+			love.graphics.setColor(1, 1, 1)
+			love.graphics.polygon("fill", k.body:getWorldPoints(k.shape:getPoints()))
 		end
 	end
 	-- ui
@@ -477,10 +537,10 @@ function beginCollision(a, b, coll)
 					local resetMask = true
 					for _, en in ipairs(enemies) do
 						if en.currentLadder == e.currentLadder and en ~= e then
-							restMask = false
+							resetMask = false
 						end
 					end
-					if restMask then
+					if resetMask then
 						pl.fixture:setMask(16)
 					end
 					e.fixture:setCategory(2)
@@ -495,7 +555,7 @@ function beginCollision(a, b, coll)
 				if e.body:getY() + e.height / 2 >= l.body:getY() + l.height / 2 - 5 then
 					e.body:setGravityScale(1)
 					e.canMove = true
-					local restMask = true
+					local resetMask = true
 					for _, en in ipairs(enemies) do
 						if en.currentLadder == e.currentLadder and en ~= e then
 							resetMask = false
