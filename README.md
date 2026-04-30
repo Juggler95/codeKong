@@ -11,7 +11,6 @@ to run this project you will need to install [LÖVE](https://www.love2d.org/)
 then inside of the projects directory on your system you can run `love .` to play
 
 #### Currently Working On
-aligning enemys when going down ladders
 
 #### Features still coming:
 
@@ -22,5 +21,3 @@ aligning enemys when going down ladders
 - Scoring and highscore systems
 
 #### known bugs:
-
-enemys sometimes freeze

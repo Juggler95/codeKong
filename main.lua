@@ -375,6 +375,18 @@ function love.update(dt)
 		end
 	end
 
+	-- center enemy on ladders
+	if enemyCount >= 1 then
+		for _, e in ipairs(enemies) do
+			if e.currentLadder ~= 0 then
+				local l = e.currentLadder
+				local x = l.body:getX()
+				local y = e.body:getY()
+				e.body:setPosition(x, y)
+			end
+		end
+	end
+
 	if player.tookDamage then
 		ResetLocationsOnDamage()
 	end
@@ -461,8 +473,18 @@ function beginCollision(a, b, coll)
 				if e.body:getY() + e.height / 2 >= l.body:getY() + l.height / 2 - 5 then
 					e.body:setGravityScale(1)
 					e.canMove = true
+					-- logic for making it so enemies don't freeze when another enemy is at the end of a ladder
+					local resetMask = true
+					for _, en in ipairs(enemies) do
+						if en.currentLadder == e.currentLadder and en ~= e then
+							restMask = false
+						end
+					end
+					if restMask then
+						pl.fixture:setMask(16)
+					end
 					e.fixture:setCategory(2)
-					pl.fixture:setMask(16)
+					e.currentLadder = 0
 				end
 			end
 		elseif objB.name == "enemy" and objA.name == "platform" then
@@ -473,8 +495,17 @@ function beginCollision(a, b, coll)
 				if e.body:getY() + e.height / 2 >= l.body:getY() + l.height / 2 - 5 then
 					e.body:setGravityScale(1)
 					e.canMove = true
+					local restMask = true
+					for _, en in ipairs(enemies) do
+						if en.currentLadder == e.currentLadder and en ~= e then
+							resetMask = false
+						end
+					end
+					if resetMask then
+						pl.fixture:setMask(16)
+					end
 					e.fixture:setCategory(2)
-					pl.fixture:setMask(16)
+					e.currentLadder = 0
 				end
 			end
 		end
