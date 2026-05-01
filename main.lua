@@ -413,11 +413,17 @@ function love.keypressed(key)
 	if STATE == "menu" then
 		if key == "space" then
 			STATE = "game"
+    elseif key == "c" then
+      STATE = "controls"
 		end
 	elseif STATE == "gameOver" then
 		if key == "space" then
 			RestartGame()
 		elseif key == "m" then
+			STATE = "menu"
+		end
+	elseif STATE == "controls" then
+		if key == "space" then
 			STATE = "menu"
 		end
 	end
@@ -554,9 +560,16 @@ function love.draw()
 	if STATE == "menu" then
 		love.graphics.setColor(1, 1, 1)
 		local startMessage = "Press SPACE to Start"
+		local controlsMessage = "Press 'c' to Quit"
 		local quitMessage = "Press ESC to Quit"
 		love.graphics.print(startMessage, font, love.graphics.getWidth() / 2 - font:getWidth(startMessage) / 2, 150)
-		love.graphics.print(quitMessage, font, love.graphics.getWidth() / 2 - font:getWidth(quitMessage) / 2, 300)
+		love.graphics.print(
+			controlsMessage,
+			font,
+			love.graphics.getWidth() / 2 - font:getWidth(controlsMessage) / 2,
+			300
+		)
+		love.graphics.print(quitMessage, font, love.graphics.getWidth() / 2 - font:getWidth(quitMessage) / 2, 450)
 	elseif STATE == "game" then
 		local px = player.body:getX() - player.width / 2
 		local py = player.body:getY() - player.height / 2
@@ -616,6 +629,38 @@ function love.draw()
 		love.graphics.print(restartText, font, love.graphics.getWidth() / 2 - font:getWidth(restartText) / 2, 450)
 		love.graphics.print(goMainMenuText, font, love.graphics.getWidth() / 2 - font:getWidth(goMainMenuText) / 2, 600)
 		love.graphics.print(quitText, font, love.graphics.getWidth() / 2 - font:getWidth(quitText) / 2, 750)
+	elseif STATE == "controls" then
+		local leftControlsText = "Press 'a' or Left Arrow to move left"
+		local rightControlsText = "Press 'd' or Right Arrow to move left"
+		local jumpControlsText = "Press Space or 'w' or Up Arrow to Jump and to climb ladders"
+		local climbDownControlsText = "Press 's' or Down Arrow to climb down ladders"
+		local backToMainMenu = "press Space to return to the Main Menu"
+
+		love.graphics.print(
+			leftControlsText,
+			font,
+			love.graphics.getWidth() / 2 - font:getWidth(leftControlsText) / 2,
+			150
+		)
+		love.graphics.print(
+			rightControlsText,
+			font,
+			love.graphics.getWidth() / 2 - font:getWidth(rightControlsText) / 2,
+			300
+		)
+		love.graphics.print(
+			jumpControlsText,
+			font,
+			love.graphics.getWidth() / 2 - font:getWidth(jumpControlsText) / 2,
+			450
+		)
+		love.graphics.print(
+			climbDownControlsText,
+			font,
+			love.graphics.getWidth() / 2 - font:getWidth(climbDownControlsText) / 2,
+			600
+		)
+		love.graphics.print(backToMainMenu, font, love.graphics.getWidth() / 2 - font:getWidth(backToMainMenu) / 2, 750)
 	end
 end
 
