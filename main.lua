@@ -8,6 +8,7 @@ local player = {}
 
 -- keyboard(hammer)
 local keyboards = { {}, {} }
+local keyboardTimer = 0
 
 -- platforms
 local platforms = { {}, {}, {}, {}, {}, {} }
@@ -39,9 +40,12 @@ local spawnEnemyTimer = 0
 local font = love.graphics.newFont(24)
 
 -- catagorys look up
+-- 1 = default
 -- 2 = standard enemy state
--- 5 = enemy ladder state
 -- 4 = enemy climb down ladder sensor
+-- 5 = enemy ladder state
+-- 7 = ladders
+-- 8 = player keyboard state(star state from mario)
 -- 16 I just use this one when reseting a mask
 
 function love.load()
@@ -123,15 +127,15 @@ function PlayerSetup()
 	local p = player
 	local groundLevel = platforms[1]
 	-- transform
-	p.height = 60
+	p.height = 40
 	p.width = 20
 	p.starting_x = 30
 	p.starting_y = groundLevel.y - PLATFORM_HEIGHT / 2 - p.height / 2
 	p.radius = p.width / 2
 
 	-- movement
-	p.speed = 150
-	p.jumpHeight = -50
+	p.speed = 130
+	p.jumpHeight = -40
 	p.climbSpeed = -70
 	p.canJump = true
 	p.canMove = true
@@ -144,6 +148,9 @@ function PlayerSetup()
 	p.groundTimer = 0
 	p.lives = 3
 	p.tookDamage = false
+	p.holdingKeyboard = false
+	p.canUseLadder = true
+	p.keyboardTimerInterval = 5
 
 	-- physics setup
 	p.body = love.physics.newBody(World, p.starting_x, p.starting_y, "dynamic")
@@ -212,6 +219,7 @@ function LadderSetup()
 				l.shape = love.physics.newRectangleShape(l.width, l.height)
 				l.fixture = love.physics.newFixture(l.body, l.shape)
 				l.fixture:setUserData(l)
+				l.fixture:setCategory(7)
 				l.fixture:setMask(2, 5)
 
 				l.climbDownShape =
@@ -228,15 +236,15 @@ end
 function KeyboardItemSetup()
 	for _, k in ipairs(keyboards) do
 		k.name = "keyboard"
-		k.height = 50
+		k.height = 40
 		k.width = 20
 	end
 	local k = keyboards
 	local pl = platforms
-	k[1].x = love.graphics.getWidth() - 200
+	k[1].x = love.graphics.getWidth() - 220
 	k[1].y = pl[2].body:getY() - PLATFORM_HEIGHT / 2 - k[1].height / 2 - 60
 
-	k[2].x = 200
+	k[2].x = 220
 	k[2].y = pl[5].body:getY() - PLATFORM_HEIGHT / 2 - k[2].height / 2 - 60
 
 	for _, key in ipairs(keyboards) do
@@ -285,6 +293,7 @@ function SpawnEnemy()
 	e.scoringSensor = love.physics.newFixture(e.body, e.scoringShape)
 	e.scoringSensor:setUserData(e)
 	e.scoringSensor:setSensor(true)
+	e.scoringSensor:setMask(8)
 
 	table.insert(enemies, e)
 	spawnEnemyTimer = 0
@@ -308,6 +317,7 @@ function ResetLocationsOnDamage()
 	p.currentLadder = 0
 	p.onLadder = false
 	p.isGrounded = true
+	p.canUseLadder = true
 end
 
 -- MOVEMENT
@@ -347,7 +357,7 @@ end
 
 function LadderMovement(direction)
 	local p = player
-	if p.onLadder then
+	if p.onLadder and p.canUseLadder then
 		local px, _ = p.body:getLinearVelocity()
 		p.isGrounded = false
 		if direction == "up" then
@@ -389,6 +399,22 @@ function love.update(dt)
 	PlayerMovement()
 	if player.currentLadder ~= 0 and player.onLadder then
 		inPlatformCheck(player, player.currentLadder)
+	end
+
+	if player.holdingKeyboard then
+		local timerInterval = player.keyboardTimerInterval
+
+		keyboardTimer = keyboardTimer + dt
+		if keyboardTimer >= timerInterval then
+			keyboardTimer = 0
+			player.holdingKeyboard = false
+			player.canUseLadder = true
+			player.bodyFixture:setCategory(1)
+			player.feetFixture:setCategory(1)
+			player.bodyFixture:setMask(4)
+			player.feetFixture:setMask(4)
+			print(player.holdingKeyboard)
+		end
 	end
 
 	-- claude helped me figure out timer logic
@@ -507,6 +533,12 @@ function beginCollision(a, b, coll)
 			objB.onLadder = true
 		end
 
+		if objA.name == "player" and objB.name == "keyboard" then
+			PickupKeyboard(objA, objB)
+		elseif objA.name == "keyboard" and objB.name == "player" then
+			PickupKeyboard(objB, objA)
+		end
+
 		if objA.name == "enemy" and objB.name == "barrier" then
 			objA.isRight = not objA.isRight
 		elseif objA.name == "barrier" and objB.name == "enemy" then
@@ -526,48 +558,9 @@ function beginCollision(a, b, coll)
 
 		-- enemy stop moving on ladder logic
 		if objA.name == "enemy" and objB.name == "platform" then
-			local e = objA
-			local l = e.currentLadder
-			if l ~= 0 then
-				local pl = l.abovePlatform
-				if e.body:getY() + e.height / 2 >= l.body:getY() + l.height / 2 - 5 then
-					e.body:setGravityScale(1)
-					e.canMove = true
-					-- logic for making it so enemies don't freeze when another enemy is at the end of a ladder
-					local resetMask = true
-					for _, en in ipairs(enemies) do
-						if en.currentLadder == e.currentLadder and en ~= e then
-							resetMask = false
-						end
-					end
-					if resetMask then
-						pl.fixture:setMask(16)
-					end
-					e.fixture:setCategory(2)
-					e.currentLadder = 0
-				end
-			end
+			EnemyStopLadderMovement(objA)
 		elseif objB.name == "enemy" and objA.name == "platform" then
-			local e = objB
-			local l = e.currentLadder
-			if l ~= 0 then
-				local pl = l.abovePlatform
-				if e.body:getY() + e.height / 2 >= l.body:getY() + l.height / 2 - 5 then
-					e.body:setGravityScale(1)
-					e.canMove = true
-					local resetMask = true
-					for _, en in ipairs(enemies) do
-						if en.currentLadder == e.currentLadder and en ~= e then
-							resetMask = false
-						end
-					end
-					if resetMask then
-						pl.fixture:setMask(16)
-					end
-					e.fixture:setCategory(2)
-					e.currentLadder = 0
-				end
-			end
+			EnemyStopLadderMovement(objB)
 		end
 
 		-- damage check
@@ -577,8 +570,10 @@ function beginCollision(a, b, coll)
 					SCORE = SCORE + 100
 				end
 			else
-				objA.lives = objA.lives - 1
-				objA.tookDamage = true
+				if objA.bodyFixture:getCategory() ~= 8 and objA.feetFixture:getCategory() ~= 8 then
+					objA.lives = objA.lives - 1
+					objA.tookDamage = true
+				end
 			end
 		elseif objA.name == "enemy" and objB.name == "player" then
 			if a == objA.scoringSensor then
@@ -586,28 +581,20 @@ function beginCollision(a, b, coll)
 					SCORE = SCORE + 100
 				end
 			else
-				objB.lives = objB.lives - 1
-				objB.tookDamage = true
+				if objB.bodyFixture:getCategory() ~= 8 and objB.feetFixture:getCategory() ~= 8 then
+					objB.lives = objB.lives - 1
+					objB.tookDamage = true
+				else
+					objA.body:destroy()
+					for i, e in ipairs(enemies) do
+						if e == objA then
+							table.remove(enemies, i)
+							break
+						end
+					end
+					SCORE = SCORE + 200
+				end
 			end
-		end
-	end
-end
-
-function EnemyLadderLogic(e, l)
-	local randNum = math.random(1, e.climbLadderChance)
-	if randNum == 1 then
-		local p = l.abovePlatform
-		e.canMove = false
-		e.isRight = not e.isRight
-		e.fixture:setCategory(5)
-		p.fixture:setMask(5)
-		e.climbLadderChance = 8
-		e.body:setGravityScale(0)
-		e.body:setLinearVelocity(0, 50)
-		e.currentLadder = l
-	else
-		if math.random(1, 2) == 1 then
-			e.climbLadderChance = e.climbLadderChance - 1
 		end
 	end
 end
@@ -713,4 +700,65 @@ function inPlatformCheck(p, l)
 	elseif p.body:getY() - p.height / 2 > pl.body:getY() + PLATFORM_HEIGHT / 2 then
 		p.canMove = true
 	end
+end
+
+function EnemyLadderLogic(e, l)
+	local randNum = math.random(1, e.climbLadderChance)
+	if randNum == 1 then
+		local p = l.abovePlatform
+		e.canMove = false
+		e.isRight = not e.isRight
+		e.fixture:setCategory(5)
+		p.fixture:setMask(5)
+		e.climbLadderChance = 8
+		e.body:setGravityScale(0)
+		e.body:setLinearVelocity(0, 50)
+		e.currentLadder = l
+	else
+		if math.random(1, 2) == 1 then
+			e.climbLadderChance = e.climbLadderChance - 1
+		end
+	end
+end
+
+function EnemyStopLadderMovement(enemy)
+	local e = enemy
+	local l = e.currentLadder
+	if l ~= 0 then
+		local pl = l.abovePlatform
+		if e.body:getY() + e.height / 2 >= l.body:getY() + l.height / 2 - 5 then
+			e.body:setGravityScale(1)
+			e.canMove = true
+			-- logic for making it so enemies don't freeze when another enemy is at the end of a ladder
+			local resetMask = true
+			for _, en in ipairs(enemies) do
+				if en.currentLadder == e.currentLadder and en ~= e then
+					resetMask = false
+				end
+			end
+			if resetMask then
+				pl.fixture:setMask(16)
+			end
+			e.fixture:setCategory(2)
+			e.currentLadder = 0
+		end
+	end
+end
+
+function PickupKeyboard(p, k)
+	for i, key in ipairs(keyboards) do
+		if key == k then
+			table.remove(keyboards, i)
+			k.body:destroy()
+			break
+		end
+	end
+
+	p.holdingKeyboard = true
+	p.canUseLadder = false
+	p.bodyFixture:setMask(4, 7)
+	p.feetFixture:setMask(4, 7)
+	p.bodyFixture:setCategory(8)
+	p.feetFixture:setCategory(8)
+	print("is holding keyboard: " .. tostring(p.holdingKeyboard))
 end
