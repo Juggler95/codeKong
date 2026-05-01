@@ -11,14 +11,15 @@ to run this project you will need to install [LÖVE](https://www.love2d.org/)
 then inside of the projects directory on your system you can run `love .` to play
 
 #### Currently Working On
+level system
 
 #### Features still coming:
 
--  Main boss enemy(like Donkey Kong)
+- Main boss enemy(like Donkey Kong)
 - [x] Enemy's coming down the screen (like barrles in the original)
--  The other levels from the original game
--  Custom Art
--  Highscore systems
+- The other levels from the original game
+- Custom Art
+- Highscore systems
 
 #### known bugs:
 

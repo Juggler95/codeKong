@@ -2,6 +2,7 @@
 PLATFORM_HEIGHT = 20
 SCORE = 0
 LEVEL = 1
+STATE = "menu"
 
 -- player
 local player = {}
@@ -134,7 +135,7 @@ function PlayerSetup()
 	p.radius = p.width / 2
 
 	-- movement
-	p.speed = 130
+	p.speed = 150
 	p.jumpHeight = -40
 	p.climbSpeed = -70
 	p.canJump = true
@@ -310,7 +311,7 @@ function ResetLocationsOnDamage()
 		e[i].body:destroy()
 		e[i] = nil
 	end
-	-- enemyCount = 0
+
 	randomEnemySpawnInterval = 3
 	randomEnemySpawnIntervalLowerBounds = 2
 	randomEnemySpawnIntervalUpperBounds = 6
@@ -334,12 +335,12 @@ function PlayerMovement()
 	if love.keyboard.isDown("a") or love.keyboard.isDown("left") then
 		if p.canMove then
 			local _, vy = p.body:getLinearVelocity()
-			p.body:setLinearVelocity(-200, vy)
+			p.body:setLinearVelocity(p.speed * -1, vy)
 		end
 	elseif love.keyboard.isDown("d") or love.keyboard.isDown("right") then
 		if p.canMove then
 			local _, vy = p.body:getLinearVelocity()
-			p.body:setLinearVelocity(200, vy)
+			p.body:setLinearVelocity(p.speed, vy)
 		end
 	end
 	if love.keyboard.isDown("space") or love.keyboard.isDown("w") or love.keyboard.isDown("up") then
@@ -379,140 +380,243 @@ function EnemyMovement(e)
 end
 
 function love.keyreleased(key)
-	if key == "escape" then
-		love.event.quit()
-	elseif key == "d" or key == "a" or key == "left" or key == "right" then
-		local _, py = player.body:getLinearVelocity()
-		player.body:setLinearVelocity(0, py)
-	-- this fixes a issue with ladders of the player not stoping on the ladder when you aren't holding any movement keys
-	elseif key == "w" or key == "space" or key == "s" or key == "up" or key == "down" then
-		if player.onLadder then
-			local px, _ = player.body:getLinearVelocity()
-			player.body:setLinearVelocity(px, 0)
+	if STATE == "game" then
+		if key == "d" or key == "a" or key == "left" or key == "right" then
+			local _, py = player.body:getLinearVelocity()
+			player.body:setLinearVelocity(0, py)
+		-- this fixes a issue with ladders of the player not stoping on the ladder when you aren't holding any movement keys
+		elseif key == "w" or key == "space" or key == "s" or key == "up" or key == "down" then
+			if player.onLadder then
+				local px, _ = player.body:getLinearVelocity()
+				player.body:setLinearVelocity(px, 0)
+			end
 		end
 	end
+end
+
+function love.keypressed(key)
+	-- global binds
+	if key == "escape" then
+		love.event.quit()
+	end
+	-- debug binds
+	if key == "m" then
+		STATE = "menu"
+	elseif key == "g" then
+		STATE = "game"
+	elseif key == "o" then
+		STATE = "gameOver"
+	elseif key == "9" then
+		SCORE = 999999
+	end
+
+	if STATE == "menu" then
+		if key == "space" then
+			STATE = "game"
+		end
+	elseif STATE == "gameOver" then
+		if key == "space" then
+			RestartGame()
+		elseif key == "m" then
+			STATE = "menu"
+		end
+	end
+end
+
+-- TODO
+function RestartGame()
+	SCORE = 0
+	-- reset player
+	local p = player
+	local py = platforms[1].y - PLATFORM_HEIGHT / 2 - p.height / 2
+	p.body:setPosition(30, py)
+	p.body:setLinearVelocity(0, 0)
+	p.tookDamage = false
+	p.isGrounded = true
+	p.onLadder = false
+	p.currentLadder = 0
+	p.canUseLadder = true
+	p.holdingKeyboard = false
+	p.lives = 3
+	p.speed = 150
+
+	-- reset enemies
+	randomEnemySpawnInterval = 2
+	randomEnemySpawnIntervalLowerBounds = 2
+	randomEnemySpawnIntervalUpperBounds = 7
+	spawnEnemyTimer = 0
+
+	if #enemies > 0 then
+		for i, e in ipairs(enemies) do
+			enemies[i] = nil
+			e.body:destroy()
+		end
+	end
+
+	-- reset keyboards
+	for i, k in ipairs(keyboards) do
+		keyboards[i] = nil
+		k.body:destroy()
+	end
+	keyboards = { {}, {} }
+	KeyboardItemSetup()
+
+	-- set state
+	STATE = "game"
 end
 
 function love.update(dt)
 	World:update(dt)
 
-	PlayerMovement()
-	if player.currentLadder ~= 0 and player.onLadder then
-		inPlatformCheck(player, player.currentLadder)
-	end
-
-	if player.holdingKeyboard then
-		local timerInterval = player.keyboardTimerInterval
-
-		keyboardTimer = keyboardTimer + dt
-		if keyboardTimer >= timerInterval then
-			keyboardTimer = 0
-			player.holdingKeyboard = false
-			player.canUseLadder = true
-			player.bodyFixture:setCategory(1)
-			player.feetFixture:setCategory(1)
-			player.bodyFixture:setMask(4)
-			player.feetFixture:setMask(4)
-			print(player.holdingKeyboard)
+	if STATE == "game" then
+		if player.lives <= 0 then
+			STATE = "gameOver"
 		end
-	end
 
-	-- claude helped me figure out timer logic
-	-- gives the player a delay after coming through a platform where they can't jump so they don't jump right when coming out of ladder and looking like they get launched
-	if not player.canJump then
-		player.canMove = true
-		player.groundTimer = player.groundTimer + dt
-		if player.groundTimer >= 0.1 then
-			player.groundTimer = 0
-			player.isGrounded = true
-			player.canJump = true
+		PlayerMovement()
+		if player.currentLadder ~= 0 and player.onLadder then
+			inPlatformCheck(player, player.currentLadder)
 		end
-	end
 
-	spawnEnemyTimer = spawnEnemyTimer + dt
-	if spawnEnemyTimer >= randomEnemySpawnInterval then
-		spawnEnemyTimer = 0
-		if #enemies % 5 == 0 then
-			if randomEnemySpawnIntervalUpperBounds >= 3 then
-				randomEnemySpawnIntervalUpperBounds = randomEnemySpawnIntervalUpperBounds - 1
-			else
-				if randomEnemySpawnIntervalLowerBounds >= 2 then
-					randomEnemySpawnIntervalLowerBounds = randomEnemySpawnIntervalLowerBounds - 1
+		if player.holdingKeyboard then
+			local timerInterval = player.keyboardTimerInterval
+
+			keyboardTimer = keyboardTimer + dt
+			if keyboardTimer >= timerInterval then
+				keyboardTimer = 0
+				player.holdingKeyboard = false
+				player.canUseLadder = true
+				player.bodyFixture:setCategory(1)
+				player.feetFixture:setCategory(1)
+				player.bodyFixture:setMask(4)
+				player.feetFixture:setMask(4)
+				player.speed = 150
+			end
+		end
+
+		-- claude helped me figure out timer logic
+		-- gives the player a delay after coming through a platform where they can't jump so they don't jump right when coming out of ladder and looking like they get launched
+		if not player.canJump then
+			player.canMove = true
+			player.groundTimer = player.groundTimer + dt
+			if player.groundTimer >= 0.1 then
+				player.groundTimer = 0
+				player.isGrounded = true
+				player.canJump = true
+			end
+		end
+
+		spawnEnemyTimer = spawnEnemyTimer + dt
+		if spawnEnemyTimer >= randomEnemySpawnInterval then
+			spawnEnemyTimer = 0
+			if #enemies % 5 == 0 then
+				if randomEnemySpawnIntervalUpperBounds >= 3 then
+					randomEnemySpawnIntervalUpperBounds = randomEnemySpawnIntervalUpperBounds - 1
+				else
+					if randomEnemySpawnIntervalLowerBounds >= 2 then
+						randomEnemySpawnIntervalLowerBounds = randomEnemySpawnIntervalLowerBounds - 1
+					end
+				end
+			end
+			randomEnemySpawnInterval =
+				math.random(randomEnemySpawnIntervalLowerBounds, randomEnemySpawnIntervalUpperBounds)
+			SpawnEnemy()
+		end
+
+		-- enemy movement
+		if #enemies >= 1 then
+			for _, e in ipairs(enemies) do
+				if e.canMove then
+					EnemyMovement(e)
 				end
 			end
 		end
-		randomEnemySpawnInterval = math.random(randomEnemySpawnIntervalLowerBounds, randomEnemySpawnIntervalUpperBounds)
-		SpawnEnemy()
-	end
 
-	-- enemy movement
-	if #enemies >= 1 then
-		for _, e in ipairs(enemies) do
-			if e.canMove then
-				EnemyMovement(e)
+		-- center enemy on ladders
+		if #enemies >= 1 then
+			for _, e in ipairs(enemies) do
+				if e.currentLadder ~= 0 then
+					local l = e.currentLadder
+					local x = l.body:getX()
+					local y = e.body:getY()
+					e.body:setPosition(x, y)
+				end
 			end
 		end
-	end
 
-	-- center enemy on ladders
-	if #enemies >= 1 then
-		for _, e in ipairs(enemies) do
-			if e.currentLadder ~= 0 then
-				local l = e.currentLadder
-				local x = l.body:getX()
-				local y = e.body:getY()
-				e.body:setPosition(x, y)
-			end
+		if player.tookDamage then
+			ResetLocationsOnDamage()
 		end
-	end
-
-	if player.tookDamage then
-		ResetLocationsOnDamage()
 	end
 end
 
 function love.draw()
-	local px = player.body:getX() - player.width / 2
-	local py = player.body:getY() - player.height / 2
-	love.graphics.setColor(1, 0, 0)
-	love.graphics.rectangle("fill", px, py, player.width, player.height)
+	if STATE == "menu" then
+		love.graphics.setColor(1, 1, 1)
+		local startMessage = "Press SPACE to Start"
+		local quitMessage = "Press ESC to Quit"
+		love.graphics.print(startMessage, font, love.graphics.getWidth() / 2 - font:getWidth(startMessage) / 2, 150)
+		love.graphics.print(quitMessage, font, love.graphics.getWidth() / 2 - font:getWidth(quitMessage) / 2, 300)
+	elseif STATE == "game" then
+		local px = player.body:getX() - player.width / 2
+		local py = player.body:getY() - player.height / 2
+		if player.holdingKeyboard then
+			love.graphics.setColor(0, 1, 0)
+		else
+			love.graphics.setColor(1, 0, 0)
+		end
+		love.graphics.rectangle("fill", px, py, player.width, player.height)
 
-	-- platforms
-	for _, p in ipairs(platforms) do
-		love.graphics.setColor(1, 0, 1)
-		love.graphics.polygon("fill", p.body:getWorldPoints(p.shape:getPoints()))
-		love.graphics.origin()
-	end
+		-- platforms
+		for _, p in ipairs(platforms) do
+			love.graphics.setColor(1, 0, 1)
+			love.graphics.polygon("fill", p.body:getWorldPoints(p.shape:getPoints()))
+			love.graphics.origin()
+		end
 
-	-- ladders
-	for _, t in ipairs(ladderTypes) do
-		for __, l in ipairs(t) do
-			if l then
-				-- used claude to help me find a aqua color and how to convert 255 rgb values to how lua does color
-				love.graphics.setColor(0, 200 / 255, 220 / 255)
-				love.graphics.polygon("fill", l.body:getWorldPoints(l.shape:getPoints()))
+		-- ladders
+		for _, t in ipairs(ladderTypes) do
+			for __, l in ipairs(t) do
+				if l then
+					-- used claude to help me find a aqua color and how to convert 255 rgb values to how lua does color
+					love.graphics.setColor(0, 200 / 255, 220 / 255)
+					love.graphics.polygon("fill", l.body:getWorldPoints(l.shape:getPoints()))
+				end
 			end
 		end
-	end
 
-	-- enemys
-	for _, e in ipairs(enemies) do
-		if e then
-			love.graphics.setColor(1, 0, 0)
-			love.graphics.polygon("fill", e.body:getWorldPoints(e.shape:getPoints()))
+		-- enemys
+		for _, e in ipairs(enemies) do
+			if e then
+				love.graphics.setColor(1, 0, 0)
+				love.graphics.polygon("fill", e.body:getWorldPoints(e.shape:getPoints()))
+			end
 		end
-	end
-	-- keyboards
-	for _, k in ipairs(keyboards) do
-		if k then
-			love.graphics.setColor(1, 1, 1)
-			love.graphics.polygon("fill", k.body:getWorldPoints(k.shape:getPoints()))
+		-- keyboards
+		for _, k in ipairs(keyboards) do
+			if k then
+				love.graphics.setColor(1, 1, 1)
+				love.graphics.polygon("fill", k.body:getWorldPoints(k.shape:getPoints()))
+			end
 		end
+		-- ui
+		love.graphics.setColor(1, 1, 1)
+		love.graphics.print("Score: " .. tostring(SCORE), font, 10, 0)
+		love.graphics.print("Lives: " .. tostring(player.lives), font, 10, 40)
+	elseif STATE == "gameOver" then
+		love.graphics.setColor(1, 0, 0)
+		local gameOverText = "GAME OVER!"
+		local finalScore = "Score: " .. tostring(SCORE)
+		local restartText = "Press Space to restart"
+		local goMainMenuText = "Press m to Return to the Main Menu"
+		local quitText = "Press ESC to Quit"
+
+		love.graphics.print(gameOverText, font, love.graphics.getWidth() / 2 - font:getWidth(gameOverText) / 2, 150)
+		love.graphics.print(finalScore, font, love.graphics.getWidth() / 2 - font:getWidth(finalScore) / 2, 300)
+		love.graphics.print(restartText, font, love.graphics.getWidth() / 2 - font:getWidth(restartText) / 2, 450)
+		love.graphics.print(goMainMenuText, font, love.graphics.getWidth() / 2 - font:getWidth(goMainMenuText) / 2, 600)
+		love.graphics.print(quitText, font, love.graphics.getWidth() / 2 - font:getWidth(quitText) / 2, 750)
 	end
-	-- ui
-	love.graphics.setColor(1, 1, 1)
-	love.graphics.print("Score: " .. tostring(SCORE), font, 10, 0)
-	love.graphics.print("Lives: " .. tostring(player.lives), font, 10, 40)
 end
 
 -- collision
@@ -573,6 +677,15 @@ function beginCollision(a, b, coll)
 				if objA.bodyFixture:getCategory() ~= 8 and objA.feetFixture:getCategory() ~= 8 then
 					objA.lives = objA.lives - 1
 					objA.tookDamage = true
+				else
+					objB.body:destroy()
+					for i, e in ipairs(enemies) do
+						if e == objB then
+							table.remove(enemies, i)
+							break
+						end
+					end
+					SCORE = SCORE + 200
 				end
 			end
 		elseif objA.name == "enemy" and objB.name == "player" then
@@ -760,5 +873,5 @@ function PickupKeyboard(p, k)
 	p.feetFixture:setMask(4, 7)
 	p.bodyFixture:setCategory(8)
 	p.feetFixture:setCategory(8)
-	print("is holding keyboard: " .. tostring(p.holdingKeyboard))
+	p.speed = 250
 end
