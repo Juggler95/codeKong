@@ -3,6 +3,10 @@ PLATFORM_HEIGHT = 20
 SCORE = 0
 LEVEL = 1
 STATE = "menu"
+USING_CONTROLLER = false
+
+local joysticks = love.joystick.getJoysticks()
+joystick = joysticks[1]
 
 -- player
 local player = {}
@@ -393,27 +397,52 @@ function PlayerMovement()
 		player.body:setGravityScale(1)
 	end
 
-	if love.keyboard.isDown("a") or love.keyboard.isDown("left") then
-		if p.canMove then
-			local _, vy = p.body:getLinearVelocity()
-			p.body:setLinearVelocity(p.speed * -1, vy)
+	if not USING_CONTROLLER then
+		if love.keyboard.isDown("a") or love.keyboard.isDown("left") then
+			if p.canMove then
+				local _, vy = p.body:getLinearVelocity()
+				p.body:setLinearVelocity(p.speed * -1, vy)
+			end
+		elseif love.keyboard.isDown("d") or love.keyboard.isDown("right") then
+			if p.canMove then
+				local _, vy = p.body:getLinearVelocity()
+				p.body:setLinearVelocity(p.speed, vy)
+			end
 		end
-	elseif love.keyboard.isDown("d") or love.keyboard.isDown("right") then
-		if p.canMove then
-			local _, vy = p.body:getLinearVelocity()
-			p.body:setLinearVelocity(p.speed, vy)
+		if love.keyboard.isDown("space") or love.keyboard.isDown("w") or love.keyboard.isDown("up") then
+			if p.isGrounded and p.onLadder == false then
+				p.isGrounded = false
+				p.body:applyLinearImpulse(0, p.jumpHeight)
+			end
+			-- ladder movement logic
+			LadderMovement("up")
+		elseif love.keyboard.isDown("s") or love.keyboard.isDown("down") then
+			LadderMovement("down")
 		end
-	end
-	if love.keyboard.isDown("space") or love.keyboard.isDown("w") or love.keyboard.isDown("up") then
-		if p.isGrounded and p.onLadder == false then
-			p.isGrounded = false
-			p.body:applyLinearImpulse(0, p.jumpHeight)
+	else
+		if joystick:isGamepadDown("dpleft") or joystick:getGamepadAxis("leftx") == -1 then
+			if p.canMove then
+				local _, vy = p.body:getLinearVelocity()
+				p.body:setLinearVelocity(p.speed * -1, vy)
+			end
 		end
-
-		-- ladder movement logic
-		LadderMovement("up")
-	elseif love.keyboard.isDown("s") or love.keyboard.isDown("down") then
-		LadderMovement("down")
+		if joystick:isGamepadDown("dpright") or joystick:getGamepadAxis("leftx") == 1 then
+			if p.canMove then
+				local _, vy = p.body:getLinearVelocity()
+				p.body:setLinearVelocity(p.speed, vy)
+			end
+		end
+		if joystick:isGamepadDown("dpup") or joystick:isGamepadDown("a") then
+			if p.isGrounded and p.onLadder == false then
+				p.isGrounded = false
+				p.body:applyLinearImpulse(0, p.jumpHeight)
+			end
+			-- ladder movement logic
+			LadderMovement("up")
+		end
+		if joystick:isGamepadDown("dpdown") or joystick:isGamepadDown("b") then
+			LadderMovement("down")
+		end
 	end
 end
 
@@ -455,6 +484,21 @@ function love.keyreleased(key)
 	end
 end
 
+function love.gamepadreleased(j, button)
+	if STATE == "game" then
+		if button == "dpleft" or button == "dpright" then
+			local _, py = player.body:getLinearVelocity()
+			player.body:setLinearVelocity(0, py)
+		-- this fixes a issue with ladders of the player not stoping on the ladder when you aren't holding any movement keys
+		elseif button == "dpup" or button == "a" or button == "dpdown" or button == "b" then
+			if player.onLadder then
+				local px, _ = player.body:getLinearVelocity()
+				player.body:setLinearVelocity(px, 0)
+			end
+		end
+	end
+end
+
 function love.keypressed(key)
 	-- global binds
 	if key == "escape" then
@@ -479,6 +523,8 @@ function love.keypressed(key)
 			STATE = "game"
 		elseif key == "c" then
 			STATE = "controls"
+		elseif key == "j" then
+			USING_CONTROLLER = not USING_CONTROLLER
 		end
 	elseif STATE == "gameOver" then
 		if key == "space" then
@@ -553,6 +599,11 @@ function love.update(dt)
 		if player.winRestart then
 			player.winRestart = false
 			WinReset()
+		end
+		-- this is for stoping player movement when the joystick isn't being moved taking in a small deadzone for drift
+		if joystick:getGamepadAxis("leftx") > -0.3 and joystick:getGamepadAxis("leftx") < 0.3 then
+			local _, py = player.body:getLinearVelocity()
+			player.body:setLinearVelocity(0, py)
 		end
 
 		if player.holdingKeyboard then
@@ -633,6 +684,8 @@ function love.draw()
 		local startMessage = "Press SPACE to Start"
 		local controlsMessage = "Press 'c' to see Controls"
 		local quitMessage = "Press ESC to Quit"
+		local controllerMessage = "Press 'j' to switch to controller controls. current on = "
+			.. tostring(USING_CONTROLLER)
 		love.graphics.print(startMessage, font, love.graphics.getWidth() / 2 - font:getWidth(startMessage) / 2, 150)
 		love.graphics.print(
 			controlsMessage,
@@ -641,6 +694,12 @@ function love.draw()
 			300
 		)
 		love.graphics.print(quitMessage, font, love.graphics.getWidth() / 2 - font:getWidth(quitMessage) / 2, 450)
+		love.graphics.print(
+			controllerMessage,
+			font,
+			love.graphics.getWidth() / 2 - font:getWidth(quitMessage) - 150,
+			600
+		)
 	elseif STATE == "game" then
 		local px = player.body:getX() - player.width / 2
 		local py = player.body:getY() - player.height / 2
@@ -713,37 +772,79 @@ function love.draw()
 		love.graphics.print(goMainMenuText, font, love.graphics.getWidth() / 2 - font:getWidth(goMainMenuText) / 2, 600)
 		love.graphics.print(quitText, font, love.graphics.getWidth() / 2 - font:getWidth(quitText) / 2, 750)
 	elseif STATE == "controls" then
-		local leftControlsText = "Press 'a' or Left Arrow to move left"
-		local rightControlsText = "Press 'd' or Right Arrow to move left"
-		local jumpControlsText = "Press Space or 'w' or Up Arrow to Jump and to climb ladders"
-		local climbDownControlsText = "Press 's' or Down Arrow to climb down ladders"
-		local backToMainMenu = "press Space to return to the Main Menu"
-
-		love.graphics.print(
-			leftControlsText,
-			font,
-			love.graphics.getWidth() / 2 - font:getWidth(leftControlsText) / 2,
-			150
-		)
-		love.graphics.print(
-			rightControlsText,
-			font,
-			love.graphics.getWidth() / 2 - font:getWidth(rightControlsText) / 2,
-			300
-		)
-		love.graphics.print(
-			jumpControlsText,
-			font,
-			love.graphics.getWidth() / 2 - font:getWidth(jumpControlsText) / 2,
-			450
-		)
-		love.graphics.print(
-			climbDownControlsText,
-			font,
-			love.graphics.getWidth() / 2 - font:getWidth(climbDownControlsText) / 2,
-			600
-		)
-		love.graphics.print(backToMainMenu, font, love.graphics.getWidth() / 2 - font:getWidth(backToMainMenu) / 2, 750)
+		if not USING_CONTROLLER then
+			local leftControlsText = "Press 'a' or Left Arrow to move left"
+			local rightControlsText = "Press 'd' or Right Arrow to move left"
+			local jumpControlsText = "Press Space or 'w' or Up Arrow to Jump and to climb ladders"
+			local climbDownControlsText = "Press 's' or Down Arrow to climb down ladders"
+			local backToMainMenu = "press Space to return to the Main Menu"
+			love.graphics.print(
+				leftControlsText,
+				font,
+				love.graphics.getWidth() / 2 - font:getWidth(leftControlsText) / 2,
+				150
+			)
+			love.graphics.print(
+				rightControlsText,
+				font,
+				love.graphics.getWidth() / 2 - font:getWidth(rightControlsText) / 2,
+				300
+			)
+			love.graphics.print(
+				jumpControlsText,
+				font,
+				love.graphics.getWidth() / 2 - font:getWidth(jumpControlsText) / 2,
+				450
+			)
+			love.graphics.print(
+				climbDownControlsText,
+				font,
+				love.graphics.getWidth() / 2 - font:getWidth(climbDownControlsText) / 2,
+				600
+			)
+			love.graphics.print(
+				backToMainMenu,
+				font,
+				love.graphics.getWidth() / 2 - font:getWidth(backToMainMenu) / 2,
+				750
+			)
+		else
+			local leftControlsText = "Press Left on d-pad or use joystick to move left"
+			local rightControlsText = "Press Right on d-pad or use joystick to move right"
+			local jumpControlsText = "Press Up on the d-pad or press A/X to jump and climb ladders"
+			local climbDownControlsText = "Press Down on the d-pad or press B/O to climb down ladders"
+			local backToMainMenu = "press Space to return to the Main Menu"
+			love.graphics.print(
+				leftControlsText,
+				font,
+				love.graphics.getWidth() / 2 - font:getWidth(leftControlsText) / 2,
+				150
+			)
+			love.graphics.print(
+				rightControlsText,
+				font,
+				love.graphics.getWidth() / 2 - font:getWidth(rightControlsText) / 2,
+				300
+			)
+			love.graphics.print(
+				jumpControlsText,
+				font,
+				love.graphics.getWidth() / 2 - font:getWidth(jumpControlsText) / 2,
+				450
+			)
+			love.graphics.print(
+				climbDownControlsText,
+				font,
+				love.graphics.getWidth() / 2 - font:getWidth(climbDownControlsText) / 2,
+				600
+			)
+			love.graphics.print(
+				backToMainMenu,
+				font,
+				love.graphics.getWidth() / 2 - font:getWidth(backToMainMenu) / 2,
+				750
+			)
+		end
 	end
 end
 
@@ -777,14 +878,12 @@ function beginCollision(a, b, coll)
 		if objA.name == "player" and objB.name == "platform" then
 			if b == objB.winningFixture then
 				if objB.winningFixture:getCategory() == 6 then
-					print("win")
 					objA.winRestart = true
 				end
 			end
 		elseif objA.name == "platform" and objB.name == "player" then
 			if a == objA.winningFixture then
 				if objA.winningFixture:getCategory() == 6 then
-					print("win")
 					objB.winRestart = true
 				end
 			end

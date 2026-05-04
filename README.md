@@ -12,6 +12,7 @@ then inside of the projects directory on your system you can run `love .` to pla
 
 #### Currently Working On
 
+
 #### Features still coming:
 
 - [x] Main boss enemy(like Donkey Kong)
@@ -24,3 +25,4 @@ then inside of the projects directory on your system you can run `love .` to pla
 #### known bugs:
 
 enemies sometimes freeze
+sometimes player can't climb ladders
