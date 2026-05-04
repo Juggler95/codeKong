@@ -13,6 +13,7 @@ local keyboardTimer = 0
 
 -- platforms
 local platforms = { {}, {}, {}, {}, {}, {} }
+local endingPlatform = {}
 
 -- ladders
 local edgeLadders = {
@@ -24,27 +25,32 @@ local edgeLadders = {
 }
 local variedLadders =
 	{ { abovePlatform = platforms[3] }, { abovePlatform = platforms[4] }, { abovePlatform = platforms[5] } }
-local ladderTypes = { edgeLadders, variedLadders }
+local endingLadder = { abovePlatform = endingPlatform }
+local ladderTypes = { edgeLadders, variedLadders, endingLadder }
 
 -- barriers
 local barriers = { {}, {} }
 
 -- enemy
 local enemies = {}
--- local enemyCount = 0
+local semicolon = {}
+-- enemy logic
 local randomEnemySpawnInterval = 2
 local randomEnemySpawnIntervalLowerBounds = 2
 local randomEnemySpawnIntervalUpperBounds = 7
 local spawnEnemyTimer = 0
+local baseEnemyClimbChance = 8
+EnemySpeed = 150
 
 -- ui
 local font = love.graphics.newFont(24)
 
--- catagorys look up
+-- categorys look up
 -- 1 = default
 -- 2 = standard enemy state
 -- 4 = enemy climb down ladder sensor
 -- 5 = enemy ladder state
+-- 6 = winning sensor
 -- 7 = ladders
 -- 8 = player keyboard state(star state from mario)
 -- 16 I just use this one when reseting a mask
@@ -67,6 +73,7 @@ function love.load()
 	LadderSetup()
 	PlayerSetup()
 	KeyboardItemSetup()
+	SemicolonBossSetup()
 end
 
 -- Setup Functions
@@ -93,6 +100,7 @@ end
 function PlatformSetup()
 	local plat = platforms
 	local sp = platforms[1]
+	local ep = endingPlatform
 
 	-- globals for platforms
 	local GAP = 125
@@ -116,12 +124,29 @@ function PlatformSetup()
 		end
 	end
 
+	ep.width = 200
+	ep.height = PLATFORM_HEIGHT
+	ep.x = love.graphics.getWidth() / 2 - ep.width / 2
+	ep.y = plat[#plat].y - PLATFORM_HEIGHT - GAP
+	ep.name = "platform"
+
 	for _, p in ipairs(platforms) do
 		p.body = love.physics.newBody(World, p.x, p.y, "static")
 		p.shape = love.physics.newRectangleShape(p.width, PLATFORM_HEIGHT)
 		p.fixture = love.physics.newFixture(p.body, p.shape)
 		p.fixture:setUserData(p)
 	end
+
+	ep.body = love.physics.newBody(World, ep.x, ep.y, "static")
+	ep.shape = love.physics.newRectangleShape(ep.width, PLATFORM_HEIGHT)
+	ep.winningShape = love.physics.newRectangleShape(0, -ep.height / 2 - PLATFORM_HEIGHT / 2 - 55, ep.width, 50)
+	ep.fixture = love.physics.newFixture(ep.body, ep.shape)
+	ep.winningFixture = love.physics.newFixture(ep.body, ep.winningShape)
+	ep.fixture:setUserData(ep)
+
+	ep.winningFixture:setUserData(ep)
+	ep.winningFixture:setSensor(true)
+	ep.winningFixture:setCategory(6)
 end
 
 function PlayerSetup()
@@ -135,7 +160,8 @@ function PlayerSetup()
 	p.radius = p.width / 2
 
 	-- movement
-	p.speed = 150
+	p.baseSpeed = 150
+	p.speed = p.baseSpeed
 	p.jumpHeight = -40
 	p.climbSpeed = -70
 	p.canJump = true
@@ -143,6 +169,7 @@ function PlayerSetup()
 
 	-- logic
 	p.name = "player"
+	p.inPlatform = false
 	p.isGrounded = true
 	p.onLadder = false
 	p.currentLadder = 0
@@ -152,6 +179,7 @@ function PlayerSetup()
 	p.holdingKeyboard = false
 	p.canUseLadder = true
 	p.keyboardTimerInterval = 5
+	p.winRestart = false
 
 	-- physics setup
 	p.body = love.physics.newBody(World, p.starting_x, p.starting_y, "dynamic")
@@ -174,6 +202,7 @@ end
 function LadderSetup()
 	local el = edgeLadders
 	local vl = variedLadders
+	local ed = endingLadder
 	-- position edge ladders
 	for i = 1, #el do
 		local l = el
@@ -212,6 +241,13 @@ function LadderSetup()
 	vl[3].x = love.graphics.getWidth() / 2 - vl[3].width / 2 - 100
 	vl[3].y = platforms[4].y - PLATFORM_HEIGHT / 2 - vl[3].height / 2
 
+	-- ending Ladder
+	ed.width = 15
+	ed.height = 125
+	ed.x = endingPlatform.x + endingPlatform.width / 2 - ed.width / 2
+	ed.y = platforms[#platforms].y - PLATFORM_HEIGHT / 2 - ed.height / 2
+	ed.name = "ladder"
+
 	-- ladder physics
 	for _, t in ipairs(ladderTypes) do
 		for __, l in ipairs(t) do
@@ -232,6 +268,13 @@ function LadderSetup()
 			end
 		end
 	end
+
+	ed.body = love.physics.newBody(World, ed.x, ed.y, "static")
+	ed.shape = love.physics.newRectangleShape(ed.width, ed.height)
+	ed.fixture = love.physics.newFixture(ed.body, ed.shape)
+	ed.fixture:setUserData(ed)
+	ed.fixture:setCategory(7)
+	ed.fixture:setMask(2, 5)
 end
 
 function KeyboardItemSetup()
@@ -272,9 +315,9 @@ function SpawnEnemy()
 	e.starting_y = platforms[#platforms].y - PLATFORM_HEIGHT / 2 - e.height / 2
 
 	-- logic
-	e.speed = 150
+	e.speed = EnemySpeed
 	e.isRight = true
-	e.climbLadderChance = 8
+	e.climbLadderChance = baseEnemyClimbChance
 	e.canMove = true
 	e.onLadder = false
 	e.currentLadder = 0
@@ -300,6 +343,22 @@ function SpawnEnemy()
 	spawnEnemyTimer = 0
 end
 
+function SemicolonBossSetup()
+	local b = semicolon
+	b.width = 50
+	b.height = 100
+	b.x = 50
+	b.y = platforms[#platforms].body:getY() - PLATFORM_HEIGHT / 2 - b.height / 2
+	b.name = "semicolon"
+
+	-- physics setup
+	b.body = love.physics.newBody(World, b.x, b.y, "static")
+	b.shape = love.physics.newRectangleShape(b.width, b.height)
+	b.fixture = love.physics.newFixture(b.body, b.shape)
+	b.fixture:setUserData(b)
+	b.fixture:setMask(5, 2)
+end
+
 function ResetLocationsOnDamage()
 	local p = player
 	local e = enemies
@@ -311,14 +370,16 @@ function ResetLocationsOnDamage()
 		e[i].body:destroy()
 		e[i] = nil
 	end
-
 	randomEnemySpawnInterval = 3
 	randomEnemySpawnIntervalLowerBounds = 2
 	randomEnemySpawnIntervalUpperBounds = 6
 	p.currentLadder = 0
 	p.onLadder = false
 	p.isGrounded = true
+	p.canJump = true
+	p.canMove = true
 	p.canUseLadder = true
+	math.randomseed(os.time())
 end
 
 -- MOVEMENT
@@ -408,13 +469,16 @@ function love.keypressed(key)
 		STATE = "gameOver"
 	elseif key == "9" then
 		SCORE = 999999
+	elseif key == "i" then
+		local y = platforms[#platforms].y - PLATFORM_HEIGHT / 2 - player.height / 2
+		player.body:setPosition(love.graphics.getWidth() / 2, y)
 	end
 
 	if STATE == "menu" then
 		if key == "space" then
 			STATE = "game"
-    elseif key == "c" then
-      STATE = "controls"
+		elseif key == "c" then
+			STATE = "controls"
 		end
 	elseif STATE == "gameOver" then
 		if key == "space" then
@@ -429,7 +493,6 @@ function love.keypressed(key)
 	end
 end
 
--- TODO
 function RestartGame()
 	SCORE = 0
 	-- reset player
@@ -443,8 +506,10 @@ function RestartGame()
 	p.currentLadder = 0
 	p.canUseLadder = true
 	p.holdingKeyboard = false
+	p.canJump = true
+	p.canMove = true
 	p.lives = 3
-	p.speed = 150
+	p.speed = p.baseSpeed
 
 	-- reset enemies
 	randomEnemySpawnInterval = 2
@@ -469,6 +534,7 @@ function RestartGame()
 
 	-- set state
 	STATE = "game"
+	math.randomseed(os.time())
 end
 
 function love.update(dt)
@@ -484,6 +550,11 @@ function love.update(dt)
 			inPlatformCheck(player, player.currentLadder)
 		end
 
+		if player.winRestart then
+			player.winRestart = false
+			WinReset()
+		end
+
 		if player.holdingKeyboard then
 			local timerInterval = player.keyboardTimerInterval
 
@@ -496,7 +567,7 @@ function love.update(dt)
 				player.feetFixture:setCategory(1)
 				player.bodyFixture:setMask(4)
 				player.feetFixture:setMask(4)
-				player.speed = 150
+				player.speed = player.baseSpeed
 			end
 		end
 
@@ -515,7 +586,7 @@ function love.update(dt)
 		spawnEnemyTimer = spawnEnemyTimer + dt
 		if spawnEnemyTimer >= randomEnemySpawnInterval then
 			spawnEnemyTimer = 0
-			if #enemies % 5 == 0 then
+			if #enemies % 5 == 0 and #enemies ~= 0 then
 				if randomEnemySpawnIntervalUpperBounds >= 3 then
 					randomEnemySpawnIntervalUpperBounds = randomEnemySpawnIntervalUpperBounds - 1
 				else
@@ -560,7 +631,7 @@ function love.draw()
 	if STATE == "menu" then
 		love.graphics.setColor(1, 1, 1)
 		local startMessage = "Press SPACE to Start"
-		local controlsMessage = "Press 'c' to Quit"
+		local controlsMessage = "Press 'c' to see Controls"
 		local quitMessage = "Press ESC to Quit"
 		love.graphics.print(startMessage, font, love.graphics.getWidth() / 2 - font:getWidth(startMessage) / 2, 150)
 		love.graphics.print(
@@ -586,6 +657,9 @@ function love.draw()
 			love.graphics.polygon("fill", p.body:getWorldPoints(p.shape:getPoints()))
 			love.graphics.origin()
 		end
+		love.graphics.setColor(1, 0, 1)
+		love.graphics.polygon("fill", endingPlatform.body:getWorldPoints(endingPlatform.shape:getPoints()))
+		love.graphics.origin()
 
 		-- ladders
 		for _, t in ipairs(ladderTypes) do
@@ -597,6 +671,8 @@ function love.draw()
 				end
 			end
 		end
+		love.graphics.setColor(0, 200 / 255, 220 / 255)
+		love.graphics.polygon("fill", endingLadder.body:getWorldPoints(endingLadder.shape:getPoints()))
 
 		-- enemys
 		for _, e in ipairs(enemies) do
@@ -605,6 +681,11 @@ function love.draw()
 				love.graphics.polygon("fill", e.body:getWorldPoints(e.shape:getPoints()))
 			end
 		end
+
+		-- semicolon boss
+		love.graphics.setColor(1, 0, 0)
+		love.graphics.polygon("fill", semicolon.body:getWorldPoints(semicolon.shape:getPoints()))
+
 		-- keyboards
 		for _, k in ipairs(keyboards) do
 			if k then
@@ -614,8 +695,10 @@ function love.draw()
 		end
 		-- ui
 		love.graphics.setColor(1, 1, 1)
-		love.graphics.print("Score: " .. tostring(SCORE), font, 10, 0)
-		love.graphics.print("Lives: " .. tostring(player.lives), font, 10, 40)
+		local currentLevelText = "Level: " .. tostring(LEVEL)
+		love.graphics.print(currentLevelText, font, love.graphics.getWidth() - font:getWidth(currentLevelText) - 10, 10)
+		love.graphics.print("Score: " .. tostring(SCORE), font, 10, 10)
+		love.graphics.print("Lives: " .. tostring(player.lives), font, 10, 50)
 	elseif STATE == "gameOver" then
 		love.graphics.setColor(1, 0, 0)
 		local gameOverText = "GAME OVER!"
@@ -676,18 +759,47 @@ function beginCollision(a, b, coll)
 			objB.isGrounded = true
 		end
 
+		-- player and ladder checks
 		if objA.name == "player" and objB.name == "ladder" then
 			objA.onLadder = true
 		elseif objA.name == "ladder" and objB.name == "player" then
 			objB.onLadder = true
 		end
 
+		-- keyboard checks
 		if objA.name == "player" and objB.name == "keyboard" then
 			PickupKeyboard(objA, objB)
 		elseif objA.name == "keyboard" and objB.name == "player" then
 			PickupKeyboard(objB, objA)
 		end
 
+		-- winning platform checks
+		if objA.name == "player" and objB.name == "platform" then
+			if b == objB.winningFixture then
+				if objB.winningFixture:getCategory() == 6 then
+					print("win")
+					objA.winRestart = true
+				end
+			end
+		elseif objA.name == "platform" and objB.name == "player" then
+			if a == objA.winningFixture then
+				if objA.winningFixture:getCategory() == 6 then
+					print("win")
+					objB.winRestart = true
+				end
+			end
+		end
+
+		-- semicolon checks
+		if objA.name == "player" and objB.name == "semicolon" then
+			objA.lives = objA.lives - 1
+			objA.tookDamage = true
+		elseif objA.name == "semicolon" and objB.name == "player" then
+			objB.lives = objB.lives - 1
+			objB.tookDamage = true
+		end
+
+		-- enemy and barrier checks
 		if objA.name == "enemy" and objB.name == "barrier" then
 			objA.isRight = not objA.isRight
 		elseif objA.name == "barrier" and objB.name == "enemy" then
@@ -755,6 +867,51 @@ function beginCollision(a, b, coll)
 			end
 		end
 	end
+end
+
+function WinReset()
+	-- reset player
+	local p = player
+	local py = platforms[1].y - PLATFORM_HEIGHT / 2 - p.height / 2
+	p.body:setPosition(30, py - 5)
+	p.body:setLinearVelocity(0, 0)
+	p.tookDamage = false
+	p.isGrounded = true
+	p.onLadder = false
+	p.currentLadder = 0
+	p.canUseLadder = true
+	p.canMove = true
+	p.canJump = true
+	p.holdingKeyboard = false
+	p.speed = p.baseSpeed
+	p.inPlatform = false
+
+	-- reset enemies
+	randomEnemySpawnInterval = 2
+	randomEnemySpawnIntervalLowerBounds = 1
+	randomEnemySpawnIntervalUpperBounds = 6
+	spawnEnemyTimer = 0
+	baseEnemyClimbChance = baseEnemyClimbChance - 1
+
+	if #enemies > 0 then
+		for i, e in ipairs(enemies) do
+			enemies[i] = nil
+			e.body:destroy()
+		end
+	end
+
+	-- reset keyboards
+	for i, k in ipairs(keyboards) do
+		keyboards[i] = nil
+		k.body:destroy()
+	end
+	keyboards = { {}, {} }
+	KeyboardItemSetup()
+
+	-- update globals
+	EnemySpeed = EnemySpeed + 15
+	LEVEL = LEVEL + 1
+	math.randomseed(os.time())
 end
 
 function endCollision(a, b, coll)
