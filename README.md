@@ -12,6 +12,7 @@ then inside of the projects directory on your system you can run `love .` to pla
 
 #### Currently Working On
 
+up and down ladder movement with joystick and menu navigation with controller
 
 #### Features still coming:
 

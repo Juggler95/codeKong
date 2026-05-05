@@ -432,15 +432,19 @@ function PlayerMovement()
 				p.body:setLinearVelocity(p.speed, vy)
 			end
 		end
-		if joystick:isGamepadDown("dpup") or joystick:isGamepadDown("a") then
-			if p.isGrounded and p.onLadder == false then
-				p.isGrounded = false
-				p.body:applyLinearImpulse(0, p.jumpHeight)
-			end
+		if
+			joystick:isGamepadDown("dpup") and not p.onLadder and p.isGrounded
+			or joystick:isGamepadDown("a") and not p.onLadder and p.isGrounded
+		then
+			p.isGrounded = false
+			p.body:applyLinearImpulse(0, p.jumpHeight)
+		elseif
+			joystick:isGamepadDown("dpup") and p.onLadder or joystick:getGamepadAxis("lefty") == -1 and p.onLadder
+		then
 			-- ladder movement logic
 			LadderMovement("up")
 		end
-		if joystick:isGamepadDown("dpdown") or joystick:isGamepadDown("b") then
+		if joystick:isGamepadDown("dpdown") or joystick:getGamepadAxis("lefty") == 1 then
 			LadderMovement("down")
 		end
 	end
@@ -539,6 +543,37 @@ function love.keypressed(key)
 	end
 end
 
+function love.gamepadpressed(j, button)
+	-- menu buttons
+	if STATE == "menu" then
+		if button == "b" then
+			love.event.quit()
+		elseif button == "a" then
+			STATE = "game"
+		elseif button == "y" then
+			USING_CONTROLLER = not USING_CONTROLLER
+		elseif button == "x" then
+			STATE = "controls"
+		end
+  -- controls menu buttons
+	elseif STATE == "controls" then
+		if button == "b" then
+			STATE = "menu"
+		end
+  -- game over menu buttons
+	elseif STATE == "gameOver" then
+		if button == "b" then
+			STATE = "menu"
+		elseif button == "a" then
+			RestartGame()
+		end
+  elseif STATE == "game" then
+    if button == "b" then
+      love.event.quit()
+    end
+	end
+end
+
 function RestartGame()
 	SCORE = 0
 	-- reset player
@@ -604,6 +639,15 @@ function love.update(dt)
 		if joystick:getGamepadAxis("leftx") > -0.3 and joystick:getGamepadAxis("leftx") < 0.3 then
 			local _, py = player.body:getLinearVelocity()
 			player.body:setLinearVelocity(0, py)
+		end
+		if
+			joystick:getGamepadAxis("lefty") > -0.3
+			and joystick:getGamepadAxis("lefty") < 0.3
+			and player.onLadder
+			and not joystick:isGamepadDown("a")
+		then
+			local px, _ = player.body:getLinearVelocity()
+			player.body:setLinearVelocity(px, 0)
 		end
 
 		if player.holdingKeyboard then
@@ -681,25 +725,53 @@ end
 function love.draw()
 	if STATE == "menu" then
 		love.graphics.setColor(1, 1, 1)
-		local startMessage = "Press SPACE to Start"
-		local controlsMessage = "Press 'c' to see Controls"
-		local quitMessage = "Press ESC to Quit"
-		local controllerMessage = "Press 'j' to switch to controller controls. current on = "
-			.. tostring(USING_CONTROLLER)
-		love.graphics.print(startMessage, font, love.graphics.getWidth() / 2 - font:getWidth(startMessage) / 2, 150)
-		love.graphics.print(
-			controlsMessage,
-			font,
-			love.graphics.getWidth() / 2 - font:getWidth(controlsMessage) / 2,
-			300
-		)
-		love.graphics.print(quitMessage, font, love.graphics.getWidth() / 2 - font:getWidth(quitMessage) / 2, 450)
-		love.graphics.print(
-			controllerMessage,
-			font,
-			love.graphics.getWidth() / 2 - font:getWidth(quitMessage) - 150,
-			600
-		)
+		if not USING_CONTROLLER then
+			local startMessage = "Press SPACE to Start"
+			local controlsMessage = "Press 'c' to see Controls"
+			local quitMessage = "Press ESC to Quit"
+			local controllerMessage = "Press 'j' to switch to controller controls. current on = "
+				.. tostring(USING_CONTROLLER)
+			love.graphics.print(startMessage, font, love.graphics.getWidth() / 2 - font:getWidth(startMessage) / 2, 150)
+			love.graphics.print(
+				controlsMessage,
+				font,
+				love.graphics.getWidth() / 2 - font:getWidth(controlsMessage) / 2,
+				300
+			)
+			love.graphics.print(quitMessage, font, love.graphics.getWidth() / 2 - font:getWidth(quitMessage) / 2, 450)
+			love.graphics.print(
+				controllerMessage,
+				font,
+				love.graphics.getWidth() / 2 - font:getWidth(quitMessage) - 150,
+				600
+			)
+		else
+			local startMessage = "Press A/X to Start"
+			local controlsMessage = "Press X/Square to see Controls"
+			local quitMessage = "Press B/O to Quit"
+			local controllerMessagep1 = "Press Y/Triangle to switch to controller controls."
+			local controllerMessagep2 = "Using Control: " .. tostring(USING_CONTROLLER)
+			love.graphics.print(startMessage, font, love.graphics.getWidth() / 2 - font:getWidth(startMessage) / 2, 150)
+			love.graphics.print(
+				controlsMessage,
+				font,
+				love.graphics.getWidth() / 2 - font:getWidth(controlsMessage) / 2,
+				300
+			)
+			love.graphics.print(quitMessage, font, love.graphics.getWidth() / 2 - font:getWidth(quitMessage) / 2, 450)
+			love.graphics.print(
+				controllerMessagep1,
+				font,
+				love.graphics.getWidth() / 2 - font:getWidth(controllerMessagep1) / 2,
+				600
+			)
+			love.graphics.print(
+				controllerMessagep2,
+				font,
+				love.graphics.getWidth() / 2 - font:getWidth(controllerMessagep2) / 2,
+				650
+			)
+		end
 	elseif STATE == "game" then
 		local px = player.body:getX() - player.width / 2
 		local py = player.body:getY() - player.height / 2
@@ -813,7 +885,7 @@ function love.draw()
 			local rightControlsText = "Press Right on d-pad or use joystick to move right"
 			local jumpControlsText = "Press Up on the d-pad or press A/X to jump and climb ladders"
 			local climbDownControlsText = "Press Down on the d-pad or press B/O to climb down ladders"
-			local backToMainMenu = "press Space to return to the Main Menu"
+			local backToMainMenu = "press B/O to return to the Main Menu"
 			love.graphics.print(
 				leftControlsText,
 				font,
