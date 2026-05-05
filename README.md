@@ -12,7 +12,7 @@ then inside of the projects directory on your system you can run `love .` to pla
 
 #### Currently Working On
 
-up and down ladder movement with joystick and menu navigation with controller
+Enemy climbing up screen after they reach the end
 
 #### Features still coming:
 
@@ -25,5 +25,5 @@ up and down ladder movement with joystick and menu navigation with controller
 
 #### known bugs:
 
-enemies sometimes freeze
-sometimes player can't climb ladders
+- enemies sometimes freeze
+- sometimes player can't climb ladders

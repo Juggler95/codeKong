@@ -46,8 +46,38 @@ local spawnEnemyTimer = 0
 local baseEnemyClimbChance = 8
 EnemySpeed = 150
 
+-- binary rain
+local binaryRain = {}
+
+-- going to add 5 seconds to length when the binary rain world event gets triggered
+BINARY_RAIN_LENGTH = 0
+local binaryRainSpawnInterval = 0.5
+local binaryRainTimer = 0
+
+local displayError = 0
+local errorDisplayTimer = 0
+local errorDisplayInterval = 2
+-- I used chatgpt to get names of random common errors
+local errorPopups = {
+	"Segmentation fault(core dumped)",
+	"NullReferenceException",
+	"IndexOutOfBoundsException",
+	"TypeError",
+	"Stack Overflow",
+	"Out of Memory",
+	"Null Pointer Dereference",
+	"SyntaxError",
+	"ValueError",
+	"Error 404",
+	"Error 418",
+}
+
+-- computer
+local computer = {}
+
 -- ui
 local font = love.graphics.newFont(24)
+local largeFont = love.graphics.newFont(50)
 
 -- categorys look up
 -- 1 = default
@@ -57,6 +87,7 @@ local font = love.graphics.newFont(24)
 -- 6 = winning sensor
 -- 7 = ladders
 -- 8 = player keyboard state(star state from mario)
+-- 9 = binary rain digits
 -- 16 I just use this one when reseting a mask
 
 function love.load()
@@ -78,6 +109,7 @@ function love.load()
 	PlayerSetup()
 	KeyboardItemSetup()
 	SemicolonBossSetup()
+	ComputerObjectSetup()
 end
 
 -- Setup Functions
@@ -139,17 +171,20 @@ function PlatformSetup()
 		p.shape = love.physics.newRectangleShape(p.width, PLATFORM_HEIGHT)
 		p.fixture = love.physics.newFixture(p.body, p.shape)
 		p.fixture:setUserData(p)
+		p.fixture:setMask(9)
 	end
 
 	ep.body = love.physics.newBody(World, ep.x, ep.y, "static")
 	ep.shape = love.physics.newRectangleShape(ep.width, PLATFORM_HEIGHT)
-	ep.winningShape = love.physics.newRectangleShape(0, -ep.height / 2 - PLATFORM_HEIGHT / 2 - 55, ep.width, 50)
+	ep.winningShape = love.physics.newRectangleShape(0, -ep.height / 2 - PLATFORM_HEIGHT / 2 - 50, ep.width, 50)
 	ep.fixture = love.physics.newFixture(ep.body, ep.shape)
 	ep.winningFixture = love.physics.newFixture(ep.body, ep.winningShape)
 	ep.fixture:setUserData(ep)
+	ep.fixture:setMask(9)
 
 	ep.winningFixture:setUserData(ep)
 	ep.winningFixture:setSensor(true)
+	ep.winningFixture:setMask(9)
 	ep.winningFixture:setCategory(6)
 end
 
@@ -159,7 +194,7 @@ function PlayerSetup()
 	-- transform
 	p.height = 40
 	p.width = 20
-	p.starting_x = 30
+	p.starting_x = 70
 	p.starting_y = groundLevel.y - PLATFORM_HEIGHT / 2 - p.height / 2
 	p.radius = p.width / 2
 
@@ -261,7 +296,7 @@ function LadderSetup()
 				l.fixture = love.physics.newFixture(l.body, l.shape)
 				l.fixture:setUserData(l)
 				l.fixture:setCategory(7)
-				l.fixture:setMask(2, 5)
+				l.fixture:setMask(2, 5, 9)
 
 				l.climbDownShape =
 					love.physics.newRectangleShape(0, -l.height / 2 - PLATFORM_HEIGHT / 2 - 20, l.width, 20)
@@ -278,7 +313,7 @@ function LadderSetup()
 	ed.fixture = love.physics.newFixture(ed.body, ed.shape)
 	ed.fixture:setUserData(ed)
 	ed.fixture:setCategory(7)
-	ed.fixture:setMask(2, 5)
+	ed.fixture:setMask(2, 5, 9)
 end
 
 function KeyboardItemSetup()
@@ -302,7 +337,7 @@ function KeyboardItemSetup()
 		key.fixture:setUserData(key)
 		key.fixture:setCategory(6)
 		key.fixture:setSensor(true)
-		key.fixture:setMask(2, 4, 5)
+		key.fixture:setMask(2, 4, 5, 9)
 	end
 end
 
@@ -325,7 +360,9 @@ function SpawnEnemy()
 	e.canMove = true
 	e.onLadder = false
 	e.currentLadder = 0
+	e.kill = false
 
+	-- physics
 	e.body = love.physics.newBody(World, e.starting_x, e.starting_y, "dynamic")
 	e.body:setFixedRotation(true)
 	e.shape = love.physics.newRectangleShape(e.width, e.height)
@@ -333,7 +370,7 @@ function SpawnEnemy()
 	e.fixture = love.physics.newFixture(e.body, e.shape)
 	e.fixture:setUserData(e)
 	e.fixture:setCategory(2)
-	e.fixture:setMask(2, 5)
+	e.fixture:setMask(2, 5, 9)
 	e.fixture:setFriction(0)
 
 	-- Scoring Sensor logic
@@ -341,10 +378,40 @@ function SpawnEnemy()
 	e.scoringSensor = love.physics.newFixture(e.body, e.scoringShape)
 	e.scoringSensor:setUserData(e)
 	e.scoringSensor:setSensor(true)
-	e.scoringSensor:setMask(8)
+	e.scoringSensor:setMask(8, 9)
 
 	table.insert(enemies, e)
 	spawnEnemyTimer = 0
+end
+
+function SpawnBinaryRainDigit()
+	local b = {}
+	b.name = "binDigit"
+
+	-- transform
+	b.width = 20
+	b.height = 40
+	b.starting_x = math.random(b.width / 2, love.graphics.getWidth() - b.width / 2)
+	b.starting_y = -10
+
+	-- logic
+	b.speed = math.random(100, 175)
+	if #binaryRain + 1 % 2 == 0 then
+		b.type = 0
+	else
+		b.type = 1
+	end
+
+	-- physics
+	b.body = love.physics.newBody(World, b.starting_x, b.starting_y, "dynamic")
+	b.body:setFixedRotation(true)
+	b.shape = love.physics.newRectangleShape(b.width, b.height)
+	b.fixture = love.physics.newFixture(b.body, b.shape)
+	b.fixture:setUserData(b)
+	b.fixture:setCategory(9)
+	b.fixture:setMask(9)
+
+	table.insert(binaryRain, b)
 end
 
 function SemicolonBossSetup()
@@ -360,20 +427,48 @@ function SemicolonBossSetup()
 	b.shape = love.physics.newRectangleShape(b.width, b.height)
 	b.fixture = love.physics.newFixture(b.body, b.shape)
 	b.fixture:setUserData(b)
-	b.fixture:setMask(5, 2)
+	b.fixture:setMask(5, 2, 9)
+end
+
+function ComputerObjectSetup()
+	local c = computer
+	c.width = 40
+	c.height = 60
+	c.x = 10 + c.width / 2
+	c.y = love.graphics.getHeight() - c.height / 2 - PLATFORM_HEIGHT / 2
+	c.name = "computer"
+
+	-- physics setup
+	c.body = love.physics.newBody(World, c.x, c.y, "static")
+	c.shape = love.physics.newRectangleShape(c.width, c.height)
+	c.fixture = love.physics.newFixture(c.body, c.shape)
+	c.fixture:setUserData(c)
+  c.fixture:setMask(9)
 end
 
 function ResetLocationsOnDamage()
 	local p = player
 	local e = enemies
 	local py = platforms[1].y - PLATFORM_HEIGHT / 2 - p.height / 2
-	p.body:setPosition(30, py)
+	p.body:setPosition(100, py)
 	p.body:setLinearVelocity(0, 0)
 	p.tookDamage = false
 	for i in pairs(e) do
 		e[i].body:destroy()
 		e[i] = nil
 	end
+
+	if #binaryRain > 0 then
+		for i, b in ipairs(binaryRain) do
+			binaryRain[i] = nil
+			b.body:destroy()
+		end
+	end
+
+	BINARY_RAIN_LENGTH = 0
+	binaryRainSpawnInterval = 0.5
+	binaryRainTimer = 0
+
 	randomEnemySpawnInterval = 3
 	randomEnemySpawnIntervalLowerBounds = 2
 	randomEnemySpawnIntervalUpperBounds = 6
@@ -419,7 +514,7 @@ function PlayerMovement()
 		elseif love.keyboard.isDown("s") or love.keyboard.isDown("down") then
 			LadderMovement("down")
 		end
-	else
+	elseif USING_CONTROLLER then
 		if joystick:isGamepadDown("dpleft") or joystick:getGamepadAxis("leftx") == -1 then
 			if p.canMove then
 				local _, vy = p.body:getLinearVelocity()
@@ -555,31 +650,30 @@ function love.gamepadpressed(j, button)
 		elseif button == "x" then
 			STATE = "controls"
 		end
-  -- controls menu buttons
+	-- controls menu buttons
 	elseif STATE == "controls" then
 		if button == "b" then
 			STATE = "menu"
 		end
-  -- game over menu buttons
+	-- game over menu buttons
 	elseif STATE == "gameOver" then
 		if button == "b" then
 			STATE = "menu"
 		elseif button == "a" then
 			RestartGame()
 		end
-  elseif STATE == "game" then
-    if button == "b" then
-      love.event.quit()
-    end
+	elseif STATE == "game" then
+		if button == "b" then
+			love.event.quit()
+		end
 	end
 end
 
 function RestartGame()
-	SCORE = 0
 	-- reset player
 	local p = player
 	local py = platforms[1].y - PLATFORM_HEIGHT / 2 - p.height / 2
-	p.body:setPosition(30, py)
+	p.body:setPosition(100, py)
 	p.body:setLinearVelocity(0, 0)
 	p.tookDamage = false
 	p.isGrounded = true
@@ -605,6 +699,18 @@ function RestartGame()
 		end
 	end
 
+	-- reset rain
+	if #binaryRain > 0 then
+		for i, b in ipairs(binaryRain) do
+			binaryRain[i] = nil
+			b.body:destroy()
+		end
+	end
+
+	BINARY_RAIN_LENGTH = 0
+	binaryRainSpawnInterval = 0.5
+	binaryRainTimer = 0
+
 	-- reset keyboards
 	for i, k in ipairs(keyboards) do
 		keyboards[i] = nil
@@ -613,8 +719,10 @@ function RestartGame()
 	keyboards = { {}, {} }
 	KeyboardItemSetup()
 
-	-- set state
+	-- set Globals
 	STATE = "game"
+	LEVEL = 0
+	SCORE = 0
 	math.randomseed(os.time())
 end
 
@@ -636,18 +744,20 @@ function love.update(dt)
 			WinReset()
 		end
 		-- this is for stoping player movement when the joystick isn't being moved taking in a small deadzone for drift
-		if joystick:getGamepadAxis("leftx") > -0.3 and joystick:getGamepadAxis("leftx") < 0.3 then
-			local _, py = player.body:getLinearVelocity()
-			player.body:setLinearVelocity(0, py)
-		end
-		if
-			joystick:getGamepadAxis("lefty") > -0.3
-			and joystick:getGamepadAxis("lefty") < 0.3
-			and player.onLadder
-			and not joystick:isGamepadDown("a")
-		then
-			local px, _ = player.body:getLinearVelocity()
-			player.body:setLinearVelocity(px, 0)
+		if USING_CONTROLLER then
+			if joystick:getGamepadAxis("leftx") > -0.3 and joystick:getGamepadAxis("leftx") < 0.3 then
+				local _, py = player.body:getLinearVelocity()
+				player.body:setLinearVelocity(0, py)
+			end
+			if
+				joystick:getGamepadAxis("lefty") > -0.3
+				and joystick:getGamepadAxis("lefty") < 0.3
+				and player.onLadder
+				and not joystick:isGamepadDown("a")
+			then
+				local px, _ = player.body:getLinearVelocity()
+				player.body:setLinearVelocity(px, 0)
+			end
 		end
 
 		if player.holdingKeyboard then
@@ -660,8 +770,8 @@ function love.update(dt)
 				player.canUseLadder = true
 				player.bodyFixture:setCategory(1)
 				player.feetFixture:setCategory(1)
-				player.bodyFixture:setMask(4)
-				player.feetFixture:setMask(4)
+				player.bodyFixture:setMask(4, 9)
+				player.feetFixture:setMask(4, 9)
 				player.speed = player.baseSpeed
 			end
 		end
@@ -704,6 +814,22 @@ function love.update(dt)
 			end
 		end
 
+		-- binary rain movement
+		if #binaryRain >= 1 then
+			for _, b in ipairs(binaryRain) do
+				b.body:setLinearVelocity(0, b.speed)
+			end
+		end
+
+		-- display error messages timer
+		if displayError ~= 0 then
+			errorDisplayTimer = errorDisplayTimer + dt
+			if errorDisplayTimer >= errorDisplayInterval then
+				displayError = 0
+				errorDisplayTimer = 0
+			end
+		end
+
 		-- center enemy on ladders
 		if #enemies >= 1 then
 			for _, e in ipairs(enemies) do
@@ -714,6 +840,19 @@ function love.update(dt)
 					e.body:setPosition(x, y)
 				end
 			end
+		end
+
+		if BINARY_RAIN_LENGTH > 0 then
+			binaryRainTimer = binaryRainTimer + dt
+			if binaryRainTimer >= binaryRainSpawnInterval then
+				SpawnBinaryRainDigit()
+				binaryRainSpawnInterval = binaryRainSpawnInterval + 0.5
+				BINARY_RAIN_LENGTH = BINARY_RAIN_LENGTH - 0.5
+			end
+		elseif BINARY_RAIN_LENGTH <= 0 then
+			BINARY_RAIN_LENGTH = 0
+			binaryRainSpawnInterval = 0.5
+			binaryRainTimer = 0
 		end
 
 		if player.tookDamage then
@@ -824,6 +963,28 @@ function love.draw()
 				love.graphics.polygon("fill", k.body:getWorldPoints(k.shape:getPoints()))
 			end
 		end
+
+		-- computer
+		love.graphics.setColor(0, 1, 1)
+		love.graphics.polygon("fill", computer.body:getWorldPoints(computer.shape:getPoints()))
+
+		for _, d in ipairs(binaryRain) do
+			if d then
+				love.graphics.setColor(1, 0, 1)
+				love.graphics.polygon("fill", d.body:getWorldPoints(d.shape:getPoints()))
+			end
+		end
+
+		if displayError ~= 0 then
+			love.graphics.setColor(1, 0, 0)
+			love.graphics.print(
+				tostring(errorPopups[displayError]),
+				largeFont,
+				love.graphics.getWidth() / 2 - largeFont:getWidth(tostring(errorPopups[displayError])) / 2,
+				love.graphics.getHeight() / 2
+			)
+		end
+
 		-- ui
 		love.graphics.setColor(1, 1, 1)
 		local currentLevelText = "Level: " .. tostring(LEVEL)
@@ -932,11 +1093,47 @@ function beginCollision(a, b, coll)
 			objB.isGrounded = true
 		end
 
+		-- platform and binary rain check
+		if objA.name == "binDigit" and objB.name == "platform" then
+			objA.body:destroy()
+			for i, b in ipairs(binaryRain) do
+				if b == objA then
+					table.remove(binaryRain, i)
+				end
+			end
+		elseif objA.name == "platform" and objB.name == "binDigit" then
+			objB.body:destroy()
+			for i, b in ipairs(binaryRain) do
+				if b == objB then
+					table.remove(binaryRain, i)
+				end
+			end
+		end
+
 		-- player and ladder checks
 		if objA.name == "player" and objB.name == "ladder" then
 			objA.onLadder = true
 		elseif objA.name == "ladder" and objB.name == "player" then
 			objB.onLadder = true
+		end
+
+		-- player and binary rain digits check
+		if objA.name == "player" and objB.name == "binDigit" then
+			objA.tookDamage = true
+			objB.body:destroy()
+			for i, bin in ipairs(binaryRain) do
+				if bin == objB then
+					table.remove(binaryRain, i)
+				end
+			end
+		elseif objA.name == "binDigit" and objB.name == "player" then
+			objB.tookDamage = true
+			objA.body:destroy()
+			for i, bin in ipairs(binaryRain) do
+				if bin == objA then
+					table.remove(binaryRain, i)
+				end
+			end
 		end
 
 		-- keyboard checks
@@ -975,6 +1172,37 @@ function beginCollision(a, b, coll)
 			objA.isRight = not objA.isRight
 		elseif objA.name == "barrier" and objB.name == "enemy" then
 			objB.isRight = not objB.isRight
+		end
+
+		-- enemy and computer checks
+		if objA.name == "enemy" and objB.name == "computer" then
+			if math.random(1, 3) == 1 then
+				BINARY_RAIN_LENGTH = BINARY_RAIN_LENGTH + 5
+				if displayError == 0 then
+					displayError = math.random(1, #errorPopups)
+				end
+			end
+			objA.body:destroy()
+			for i, e in ipairs(enemies) do
+				if e == objA then
+					table.remove(enemies, i)
+					break
+				end
+			end
+		elseif objA.name == "computer" and objB.name == "enemy" then
+			if math.random(1, 3) == 1 then
+				BINARY_RAIN_LENGTH = BINARY_RAIN_LENGTH + 5
+				if displayError == 0 then
+					displayError = math.random(1, #errorPopups)
+				end
+			end
+			objB.body:destroy()
+			for i, e in ipairs(enemies) do
+				if e == objB then
+					table.remove(enemies, i)
+					break
+				end
+			end
 		end
 
 		-- enemy ladder logic
@@ -1044,7 +1272,7 @@ function WinReset()
 	-- reset player
 	local p = player
 	local py = platforms[1].y - PLATFORM_HEIGHT / 2 - p.height / 2
-	p.body:setPosition(30, py - 5)
+	p.body:setPosition(100, py - 5)
 	p.body:setLinearVelocity(0, 0)
 	p.tookDamage = false
 	p.isGrounded = true
@@ -1070,6 +1298,17 @@ function WinReset()
 			e.body:destroy()
 		end
 	end
+
+	if #binaryRain > 0 then
+		for i, b in ipairs(binaryRain) do
+			binaryRain[i] = nil
+			b.body:destroy()
+		end
+	end
+
+	BINARY_RAIN_LENGTH = 0
+	binaryRainSpawnInterval = 0.5
+	binaryRainTimer = 0
 
 	-- reset keyboards
 	for i, k in ipairs(keyboards) do
@@ -1195,7 +1434,7 @@ function EnemyLadderLogic(e, l)
 		e.canMove = false
 		e.isRight = not e.isRight
 		e.fixture:setCategory(5)
-		p.fixture:setMask(5)
+		p.fixture:setMask(5, 9)
 		e.climbLadderChance = 8
 		e.body:setGravityScale(0)
 		e.body:setLinearVelocity(0, 50)
@@ -1223,7 +1462,7 @@ function EnemyStopLadderMovement(enemy)
 				end
 			end
 			if resetMask then
-				pl.fixture:setMask(16)
+				pl.fixture:setMask(16, 9)
 			end
 			e.fixture:setCategory(2)
 			e.currentLadder = 0
@@ -1242,8 +1481,8 @@ function PickupKeyboard(p, k)
 
 	p.holdingKeyboard = true
 	p.canUseLadder = false
-	p.bodyFixture:setMask(4, 7)
-	p.feetFixture:setMask(4, 7)
+	p.bodyFixture:setMask(4, 7, 9)
+	p.feetFixture:setMask(4, 7, 9)
 	p.bodyFixture:setCategory(8)
 	p.feetFixture:setCategory(8)
 	p.speed = 250
