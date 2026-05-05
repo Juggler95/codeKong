@@ -12,8 +12,6 @@ then inside of the projects directory on your system you can run `love .` to pla
 
 #### Currently Working On
 
-Enemy climbing up screen after they reach the end
-
 #### Features still coming:
 
 - [x] Main boss enemy(like Donkey Kong)

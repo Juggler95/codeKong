@@ -77,7 +77,7 @@ local computer = {}
 
 -- ui
 local font = love.graphics.newFont(24)
-local largeFont = love.graphics.newFont(50)
+local largeFont = love.graphics.newFont(45)
 
 -- categorys look up
 -- 1 = default
@@ -443,7 +443,7 @@ function ComputerObjectSetup()
 	c.shape = love.physics.newRectangleShape(c.width, c.height)
 	c.fixture = love.physics.newFixture(c.body, c.shape)
 	c.fixture:setUserData(c)
-  c.fixture:setMask(9)
+	c.fixture:setMask(9)
 end
 
 function ResetLocationsOnDamage()
@@ -534,7 +534,9 @@ function PlayerMovement()
 			p.isGrounded = false
 			p.body:applyLinearImpulse(0, p.jumpHeight)
 		elseif
-			joystick:isGamepadDown("dpup") and p.onLadder or joystick:getGamepadAxis("lefty") == -1 and p.onLadder
+			joystick:isGamepadDown("dpup") and p.onLadder
+			or joystick:getGamepadAxis("lefty") == -1 and p.onLadder
+			or joystick:isGamepadDown("a") and p.onLadder
 		then
 			-- ladder movement logic
 			LadderMovement("up")
@@ -641,7 +643,7 @@ end
 function love.gamepadpressed(j, button)
 	-- menu buttons
 	if STATE == "menu" then
-		if button == "b" then
+		if button == "start" then
 			love.event.quit()
 		elseif button == "a" then
 			STATE = "game"
@@ -663,7 +665,7 @@ function love.gamepadpressed(j, button)
 			RestartGame()
 		end
 	elseif STATE == "game" then
-		if button == "b" then
+		if button == "start" then
 			love.event.quit()
 		end
 	end
@@ -887,7 +889,7 @@ function love.draw()
 		else
 			local startMessage = "Press A/X to Start"
 			local controlsMessage = "Press X/Square to see Controls"
-			local quitMessage = "Press B/O to Quit"
+			local quitMessage = "Press Start to Quit"
 			local controllerMessagep1 = "Press Y/Triangle to switch to controller controls."
 			local controllerMessagep2 = "Using Control: " .. tostring(USING_CONTROLLER)
 			love.graphics.print(startMessage, font, love.graphics.getWidth() / 2 - font:getWidth(startMessage) / 2, 150)
