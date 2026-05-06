@@ -18,7 +18,6 @@ then inside of the projects directory on your system you can run `love .` to pla
 - [x] Enemy's coming down the screen (like barrles in the original)
 - [x] level system
 - Custom Art
-- Highscore systems
 - SFX
 
 #### known bugs:

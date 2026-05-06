@@ -762,6 +762,7 @@ function love.update(dt)
 			end
 		end
 
+		-- stops keyboard state
 		if player.holdingKeyboard then
 			local timerInterval = player.keyboardTimerInterval
 
@@ -772,8 +773,8 @@ function love.update(dt)
 				player.canUseLadder = true
 				player.bodyFixture:setCategory(1)
 				player.feetFixture:setCategory(1)
-				player.bodyFixture:setMask(4, 9)
-				player.feetFixture:setMask(4, 9)
+				player.bodyFixture:setMask(4)
+				player.feetFixture:setMask(4)
 				player.speed = player.baseSpeed
 			end
 		end
