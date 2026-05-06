@@ -8,6 +8,8 @@ USING_CONTROLLER = false
 local joysticks = love.joystick.getJoysticks()
 joystick = joysticks[1]
 
+-- images
+
 -- player
 local player = {}
 
@@ -94,7 +96,7 @@ function love.load()
 	-- window setup
 	love.window.setMode(800, 1000)
 	love.window.setTitle("Code Kong")
-	love.graphics.setBackgroundColor(0, 0, 0)
+	love.graphics.setBackgroundColor(0.5, 0.5, 0.5)
 
 	-- physics setup
 	love.physics.setMeter(64)
@@ -145,12 +147,14 @@ function PlatformSetup()
 	sp.y = love.graphics.getHeight()
 	sp.width = love.graphics.getWidth()
 	sp.name = "platform"
+	sp.tile = love.graphics.newImage("assets/Industrial_platform.png")
 
 	for i = 2, #plat do
 		local p = plat
 		p[i].y = p[i - 1].y - GAP - PLATFORM_HEIGHT
 		p[i].width = love.graphics.getWidth() - 100
 		p[i].name = "platform"
+		p[i].tile = love.graphics.newImage("assets/Industrial_platform.png")
 		if i % 2 == 0 then
 			-- the - 50 is to align it on the left side
 			p[i].x = love.graphics.getWidth() / 2 - 50
@@ -164,6 +168,7 @@ function PlatformSetup()
 	ep.height = PLATFORM_HEIGHT
 	ep.x = love.graphics.getWidth() / 2 - ep.width / 2
 	ep.y = plat[#plat].y - PLATFORM_HEIGHT - GAP
+	ep.tile = love.graphics.newImage("assets/Industrial_platform.png")
 	ep.name = "platform"
 
 	for _, p in ipairs(platforms) do
@@ -242,11 +247,19 @@ function LadderSetup()
 	local el = edgeLadders
 	local vl = variedLadders
 	local ed = endingLadder
+
+	for _, t in ipairs(ladderTypes) do
+		for _, l in ipairs(t) do
+			l.tile = love.graphics.newImage("assets/Ladder-Tile.png")
+		end
+	end
+
+	local WIDTH = 16
 	-- position edge ladders
 	for i = 1, #el do
 		local l = el
 		l[i].height = 125
-		l[i].width = 15
+		l[i].width = WIDTH
 		l[i].name = "ladder"
 		if i % 2 == 0 then
 			-- left side
@@ -264,7 +277,7 @@ function LadderSetup()
 	-- varied Ladders setup
 	for i = 1, #vl do
 		local l = vl
-		l[i].width = 15
+		l[i].width = WIDTH
 		l[i].height = 125
 		l[i].name = "ladder"
 	end
@@ -281,7 +294,7 @@ function LadderSetup()
 	vl[3].y = platforms[4].y - PLATFORM_HEIGHT / 2 - vl[3].height / 2
 
 	-- ending Ladder
-	ed.width = 15
+	ed.width = WIDTH
 	ed.height = 125
 	ed.x = endingPlatform.x + endingPlatform.width / 2 - ed.width / 2
 	ed.y = platforms[#platforms].y - PLATFORM_HEIGHT / 2 - ed.height / 2
@@ -319,8 +332,9 @@ end
 function KeyboardItemSetup()
 	for _, k in ipairs(keyboards) do
 		k.name = "keyboard"
-		k.height = 40
 		k.width = 20
+		k.height = 40
+		k.skin = love.graphics.newImage("assets/Keyboard.png")
 	end
 	local k = keyboards
 	local pl = platforms
@@ -396,10 +410,10 @@ function SpawnBinaryRainDigit()
 
 	-- logic
 	b.speed = math.random(100, 175)
-	if #binaryRain + 1 % 2 == 0 then
-		b.type = 0
+	if #binaryRain % 2 == 0 then
+		b.skin = love.graphics.newImage("assets/Binary0.png")
 	else
-		b.type = 1
+		b.skin = love.graphics.newImage("assets/Binary1.png")
 	end
 
 	-- physics
@@ -421,6 +435,7 @@ function SemicolonBossSetup()
 	b.x = 50
 	b.y = platforms[#platforms].body:getY() - PLATFORM_HEIGHT / 2 - b.height / 2
 	b.name = "semicolon"
+	b.skin = love.graphics.newImage("assets/Semicolon.png")
 
 	-- physics setup
 	b.body = love.physics.newBody(World, b.x, b.y, "static")
@@ -432,17 +447,19 @@ end
 
 function ComputerObjectSetup()
 	local c = computer
-	c.width = 40
-	c.height = 60
+	c.width = 28
+	c.height = 35
 	c.x = 10 + c.width / 2
 	c.y = love.graphics.getHeight() - c.height / 2 - PLATFORM_HEIGHT / 2
 	c.name = "computer"
+	c.skin = love.graphics.newImage("assets/Computer.png")
 
 	-- physics setup
 	c.body = love.physics.newBody(World, c.x, c.y, "static")
 	c.shape = love.physics.newRectangleShape(c.width, c.height)
 	c.fixture = love.physics.newFixture(c.body, c.shape)
 	c.fixture:setUserData(c)
+	c.fixture:setSensor(true)
 	c.fixture:setMask(9)
 end
 
@@ -926,12 +943,21 @@ function love.draw()
 
 		-- platforms
 		for _, p in ipairs(platforms) do
-			love.graphics.setColor(1, 0, 1)
-			love.graphics.polygon("fill", p.body:getWorldPoints(p.shape:getPoints()))
+			love.graphics.setColor(1, 1, 1)
+			-- love.graphics.polygon("fill", p.body:getWorldPoints(p.shape:getPoints()))
+			-- claude helped me figure out this logic for making tiles work
+			local tileWidth = 20
+			for x = p.body:getX() - p.width / 2, p.body:getX() - p.width / 2 + p.width, tileWidth do
+				love.graphics.draw(p.tile, x, p.body:getY() - PLATFORM_HEIGHT / 2)
+			end
 			love.graphics.origin()
 		end
-		love.graphics.setColor(1, 0, 1)
+		love.graphics.setColor(1, 1, 1)
 		love.graphics.polygon("fill", endingPlatform.body:getWorldPoints(endingPlatform.shape:getPoints()))
+		local tileWidth = 20
+		for x = endingPlatform.body:getX() - endingPlatform.width / 2, endingPlatform.body:getX() - endingPlatform.width / 2 + endingPlatform.width, tileWidth do
+			love.graphics.draw(endingPlatform.tile, x, endingPlatform.body:getY() - PLATFORM_HEIGHT / 2)
+		end
 		love.graphics.origin()
 
 		-- ladders
@@ -939,8 +965,12 @@ function love.draw()
 			for __, l in ipairs(t) do
 				if l then
 					-- used claude to help me find a aqua color and how to convert 255 rgb values to how lua does color
-					love.graphics.setColor(0, 200 / 255, 220 / 255)
+					love.graphics.setColor(0.5, 0.5, 0.5)
 					love.graphics.polygon("fill", l.body:getWorldPoints(l.shape:getPoints()))
+					local tileHeight = 16
+					for y = l.body:getY() - l.height / 2, l.body:getY() - l.height / 2 + l.height, tileHeight do
+						love.graphics.draw(l.tile, l.body:getX() - l.width / 2, y, 0)
+					end
 				end
 			end
 		end
@@ -956,25 +986,38 @@ function love.draw()
 		end
 
 		-- semicolon boss
-		love.graphics.setColor(1, 0, 0)
-		love.graphics.polygon("fill", semicolon.body:getWorldPoints(semicolon.shape:getPoints()))
+		-- love.graphics.setColor(1, 0, 0)
+		-- love.graphics.polygon("fill", semicolon.body:getWorldPoints(semicolon.shape:getPoints()))
+		love.graphics.draw(
+			semicolon.skin,
+			semicolon.body:getX() - semicolon.width / 2,
+			semicolon.body:getY() - semicolon.height / 2
+		)
 
 		-- keyboards
-		for _, k in ipairs(keyboards) do
+		for i, k in ipairs(keyboards) do
 			if k then
 				love.graphics.setColor(1, 1, 1)
-				love.graphics.polygon("fill", k.body:getWorldPoints(k.shape:getPoints()))
+				-- love.graphics.polygon("fill", k.body:getWorldPoints(k.shape:getPoints()))
+				-- claude helped me understand the draw function
+				love.graphics.draw(k.skin, k.body:getX() - k.width / 2, k.body:getY() - k.height / 2)
 			end
 		end
 
 		-- computer
-		love.graphics.setColor(0, 1, 1)
-		love.graphics.polygon("fill", computer.body:getWorldPoints(computer.shape:getPoints()))
+		-- love.graphics.setColor(0, 1, 1)
+		-- love.graphics.polygon("fill", computer.body:getWorldPoints(computer.shape:getPoints()))
+		love.graphics.draw(
+			computer.skin,
+			computer.body:getX() - computer.width / 2,
+			computer.body:getY() - computer.height / 2
+		)
 
 		for _, d in ipairs(binaryRain) do
 			if d then
-				love.graphics.setColor(1, 0, 1)
-				love.graphics.polygon("fill", d.body:getWorldPoints(d.shape:getPoints()))
+				-- love.graphics.setColor(1, 0, 1)
+				-- love.graphics.polygon("fill", d.body:getWorldPoints(d.shape:getPoints()))
+				love.graphics.draw(d.skin, d.body:getX() - d.width / 2, d.body:getY() - d.height / 2)
 			end
 		end
 
