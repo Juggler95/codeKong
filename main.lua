@@ -1,3 +1,6 @@
+-- https://github.com/coelhucas/love-sprite-sheet-animator
+local lsa = require("modules.lsa")
+
 -- globals
 PLATFORM_HEIGHT = 20
 SCORE = 0
@@ -8,10 +11,9 @@ USING_CONTROLLER = false
 local joysticks = love.joystick.getJoysticks()
 joystick = joysticks[1]
 
--- images
-
 -- player
 local player = {}
+
 
 -- keyboard(hammer)
 local keyboards = { {}, {} }
@@ -103,6 +105,9 @@ function love.load()
 	World = love.physics.newWorld(0, 9.81 * 64, true)
 	World:setCallbacks(beginCollision, endCollision, preSolve, postSolve)
 
+	-- animations
+	enemySprite = love.graphics.newImage("assets/Bug-Sheet.png")
+
 	math.randomseed(os.time())
 
 	BarrierSetup()
@@ -127,11 +132,11 @@ function BarrierSetup()
 	b[1].x = 0 - b[1].width / 2
 	b[2].x = love.graphics.getWidth() + b[2].width / 2
 
-	for _, b in ipairs(barriers) do
-		b.body = love.physics.newBody(World, b.x, b.y, "static")
-		b.shape = love.physics.newRectangleShape(b.width, b.height)
-		b.fixture = love.physics.newFixture(b.body, b.shape)
-		b.fixture:setUserData(b)
+	for _, bar in ipairs(barriers) do
+		bar.body = love.physics.newBody(World, bar.x, bar.y, "static")
+		bar.shape = love.physics.newRectangleShape(bar.width, bar.height)
+		bar.fixture = love.physics.newFixture(bar.body, bar.shape)
+		bar.fixture:setUserData(b)
 	end
 end
 
@@ -197,8 +202,8 @@ function PlayerSetup()
 	local p = player
 	local groundLevel = platforms[1]
 	-- transform
-	p.height = 40
 	p.width = 20
+	p.height = 40
 	p.starting_x = 70
 	p.starting_y = groundLevel.y - PLATFORM_HEIGHT / 2 - p.height / 2
 	p.radius = p.width / 2
@@ -298,6 +303,7 @@ function LadderSetup()
 	ed.height = 125
 	ed.x = endingPlatform.x + endingPlatform.width / 2 - ed.width / 2
 	ed.y = platforms[#platforms].y - PLATFORM_HEIGHT / 2 - ed.height / 2
+	ed.tile = love.graphics.newImage("assets/Ladder-Tile.png")
 	ed.name = "ladder"
 
 	-- ladder physics
@@ -393,6 +399,10 @@ function SpawnEnemy()
 	e.scoringSensor:setUserData(e)
 	e.scoringSensor:setSensor(true)
 	e.scoringSensor:setMask(8, 9)
+
+	e.enemyAnimator = lsa.new(enemySprite, 4, 1)
+	e.enemyAnimator:newAnimation("walking", 1, 2, 0.5)
+	e.enemyAnimator:newAnimation("climbing", 3, 4, 0.5)
 
 	table.insert(enemies, e)
 	spawnEnemyTimer = 0
@@ -581,8 +591,10 @@ end
 function EnemyMovement(e)
 	local _, vy = e.body:getLinearVelocity()
 	if e.isRight then
+		e.enemyAnimator:play("walking")
 		e.body:setLinearVelocity(e.speed, vy)
 	else
+		e.enemyAnimator:play("walking")
 		e.body:setLinearVelocity(e.speed * -1, vy)
 	end
 end
@@ -808,6 +820,7 @@ function love.update(dt)
 			end
 		end
 
+
 		spawnEnemyTimer = spawnEnemyTimer + dt
 		if spawnEnemyTimer >= randomEnemySpawnInterval then
 			spawnEnemyTimer = 0
@@ -878,6 +891,11 @@ function love.update(dt)
 		if player.tookDamage then
 			ResetLocationsOnDamage()
 		end
+
+		-- update animations
+		for _, e in ipairs(enemies) do
+			e.enemyAnimator:update(dt)
+		end
 	end
 end
 
@@ -937,7 +955,7 @@ function love.draw()
 		if player.holdingKeyboard then
 			love.graphics.setColor(0, 1, 0)
 		else
-			love.graphics.setColor(1, 0, 0)
+			love.graphics.setColor(1, 1, 1)
 		end
 		love.graphics.rectangle("fill", px, py, player.width, player.height)
 
@@ -975,13 +993,22 @@ function love.draw()
 			end
 		end
 		love.graphics.setColor(0, 200 / 255, 220 / 255)
-		love.graphics.polygon("fill", endingLadder.body:getWorldPoints(endingLadder.shape:getPoints()))
+		-- love.graphics.polygon("fill", endingLadder.body:getWorldPoints(endingLadder.shape:getPoints()))
+		local tileHeight = 16
+		for y = endingLadder.body:getY() - endingLadder.height / 2, endingLadder.body:getY() - endingLadder.height / 2 + endingLadder.height, tileHeight do
+			love.graphics.draw(endingLadder.tile, endingLadder.body:getX() - endingLadder.width / 2, y, 0)
+		end
 
 		-- enemys
 		for _, e in ipairs(enemies) do
 			if e then
-				love.graphics.setColor(1, 0, 0)
-				love.graphics.polygon("fill", e.body:getWorldPoints(e.shape:getPoints()))
+				love.graphics.setColor(1, 1, 1)
+				-- love.graphics.polygon("fill", e.body:getWorldPoints(e.shape:getPoints()))
+				if not e.enemyAnimator.mirrored then
+					e.enemyAnimator:draw(e.body:getX() - e.width / 2, e.body:getY() - e.height / 2, 0, 5, 0, 2, 2)
+				else
+					e.enemyAnimator:draw(e.body:getX(), e.body:getY() - e.height / 2, 7, 5, 0, 2, 2)
+				end
 			end
 		end
 
@@ -1216,13 +1243,15 @@ function beginCollision(a, b, coll)
 		-- enemy and barrier checks
 		if objA.name == "enemy" and objB.name == "barrier" then
 			objA.isRight = not objA.isRight
+			objA.enemyAnimator:setMirrored(not objA.enemyAnimator.mirrored)
 		elseif objA.name == "barrier" and objB.name == "enemy" then
+			objB.enemyAnimator:setMirrored(not objB.enemyAnimator.mirrored)
 			objB.isRight = not objB.isRight
 		end
 
 		-- enemy and computer checks
 		if objA.name == "enemy" and objB.name == "computer" then
-			if math.random(1, 3) == 1 then
+			if math.random(1, 4) == 1 then
 				BINARY_RAIN_LENGTH = BINARY_RAIN_LENGTH + 5
 				if displayError == 0 then
 					displayError = math.random(1, #errorPopups)
@@ -1236,7 +1265,7 @@ function beginCollision(a, b, coll)
 				end
 			end
 		elseif objA.name == "computer" and objB.name == "enemy" then
-			if math.random(1, 3) == 1 then
+			if math.random(1, 4) == 1 then
 				BINARY_RAIN_LENGTH = BINARY_RAIN_LENGTH + 5
 				if displayError == 0 then
 					displayError = math.random(1, #errorPopups)
@@ -1412,8 +1441,8 @@ end
 function postSolve(a, b, coll, normalimpulse, tangentimpulse) end
 
 -- logic / checks
-function PlatformAboveLogic(player, platform, coll)
-	local p = player
+function PlatformAboveLogic(Player, platform, coll)
+	local p = Player
 	local pl = platform
 	local l = p.currentLadder
 
@@ -1478,6 +1507,8 @@ function EnemyLadderLogic(e, l)
 	if randNum == 1 then
 		local p = l.abovePlatform
 		e.canMove = false
+		e.enemyAnimator:play("climbing")
+		e.enemyAnimator:setMirrored(not e.enemyAnimator.mirrored)
 		e.isRight = not e.isRight
 		e.fixture:setCategory(5)
 		p.fixture:setMask(5, 9)
