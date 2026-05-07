@@ -14,7 +14,6 @@ joystick = joysticks[1]
 -- player
 local player = {}
 
-
 -- keyboard(hammer)
 local keyboards = { {}, {} }
 local keyboardTimer = 0
@@ -136,7 +135,7 @@ function BarrierSetup()
 		bar.body = love.physics.newBody(World, bar.x, bar.y, "static")
 		bar.shape = love.physics.newRectangleShape(bar.width, bar.height)
 		bar.fixture = love.physics.newFixture(bar.body, bar.shape)
-		bar.fixture:setUserData(b)
+		bar.fixture:setUserData(bar)
 	end
 end
 
@@ -820,7 +819,6 @@ function love.update(dt)
 			end
 		end
 
-
 		spawnEnemyTimer = spawnEnemyTimer + dt
 		if spawnEnemyTimer >= randomEnemySpawnInterval then
 			spawnEnemyTimer = 0
@@ -1244,9 +1242,11 @@ function beginCollision(a, b, coll)
 		if objA.name == "enemy" and objB.name == "barrier" then
 			objA.isRight = not objA.isRight
 			objA.enemyAnimator:setMirrored(not objA.enemyAnimator.mirrored)
+			print(objA.isRight)
 		elseif objA.name == "barrier" and objB.name == "enemy" then
-			objB.enemyAnimator:setMirrored(not objB.enemyAnimator.mirrored)
 			objB.isRight = not objB.isRight
+			objB.enemyAnimator:setMirrored(not objB.enemyAnimator.mirrored)
+			print(objB.isRight)
 		end
 
 		-- enemy and computer checks
