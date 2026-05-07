@@ -14,6 +14,14 @@ joystick = joysticks[1]
 -- player
 local player = {}
 
+-- player animations
+local playerSprite = love.graphics.newImage("assets/Player-Sheet.png")
+PlayerAnimator = lsa.new(playerSprite, 9, 1)
+PlayerAnimator:newAnimation("walking", 3, 6, 0.5)
+PlayerAnimator:newAnimation("idle", 1, 2, 0.5)
+PlayerAnimator:newAnimation("jumping", 7, 7)
+PlayerAnimator:newAnimation("climbing", 8, 9, 0.5)
+
 -- keyboard(hammer)
 local keyboards = { {}, {} }
 local keyboardTimer = 0
@@ -228,6 +236,7 @@ function PlayerSetup()
 	p.canUseLadder = true
 	p.keyboardTimerInterval = 5
 	p.winRestart = false
+	p.isLeft = false
 
 	-- physics setup
 	p.body = love.physics.newBody(World, p.starting_x, p.starting_y, "dynamic")
@@ -819,6 +828,35 @@ function love.update(dt)
 			end
 		end
 
+		-- player animations
+		local pvx, pvy = player.body:getLinearVelocity()
+		if player.isGrounded and not player.onLadder and pvx ~= 0 then
+			PlayerAnimator:play("walking")
+			if pvx < 0 then
+				player.isLeft = true
+				PlayerAnimator:setMirrored(true)
+			elseif pvx > 0 then
+				player.isLeft = false
+				PlayerAnimator:setMirrored(false)
+			end
+		end
+
+		if pvx == 0 and pvy == 0 and not player.onLadder then
+			PlayerAnimator:play("idle")
+		end
+
+		if player.onLadder and not player.isGrounded then
+			PlayerAnimator:play("climbing")
+		end
+
+		if not player.onLadder and not player.isGrounded and pvy ~= 0 then
+			PlayerAnimator:play("jumping")
+		end
+
+		if not PlayerAnimator.playing then
+			PlayerAnimator:play("idle")
+		end
+
 		spawnEnemyTimer = spawnEnemyTimer + dt
 		if spawnEnemyTimer >= randomEnemySpawnInterval then
 			spawnEnemyTimer = 0
@@ -894,6 +932,8 @@ function love.update(dt)
 		for _, e in ipairs(enemies) do
 			e.enemyAnimator:update(dt)
 		end
+
+		PlayerAnimator:update(dt)
 	end
 end
 
@@ -955,7 +995,15 @@ function love.draw()
 		else
 			love.graphics.setColor(1, 1, 1)
 		end
-		love.graphics.rectangle("fill", px, py, player.width, player.height)
+		-- love.graphics.rectangle("fill", px, py, player.width, player.height)
+		if player then
+			-- claude helped me figure out why I was getting a error with this line. I was trying to draw with the animator when I had no animations playing at start
+			if player.isLeft then
+				PlayerAnimator:draw(px, py, 10, 10, 0, 2, 2)
+			else
+				PlayerAnimator:draw(px, py, 0, 10, 0, 2, 2)
+			end
+		end
 
 		-- platforms
 		for _, p in ipairs(platforms) do
@@ -1242,11 +1290,9 @@ function beginCollision(a, b, coll)
 		if objA.name == "enemy" and objB.name == "barrier" then
 			objA.isRight = not objA.isRight
 			objA.enemyAnimator:setMirrored(not objA.enemyAnimator.mirrored)
-			print(objA.isRight)
 		elseif objA.name == "barrier" and objB.name == "enemy" then
 			objB.isRight = not objB.isRight
 			objB.enemyAnimator:setMirrored(not objB.enemyAnimator.mirrored)
-			print(objB.isRight)
 		end
 
 		-- enemy and computer checks
