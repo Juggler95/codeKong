@@ -16,11 +16,12 @@ local player = {}
 
 -- player animations
 local playerSprite = love.graphics.newImage("assets/Player-Sheet.png")
-PlayerAnimator = lsa.new(playerSprite, 9, 1)
-PlayerAnimator:newAnimation("walking", 3, 6, 0.5)
+PlayerAnimator = lsa.new(playerSprite, 14, 1)
 PlayerAnimator:newAnimation("idle", 1, 2, 0.5)
-PlayerAnimator:newAnimation("jumping", 7, 7)
-PlayerAnimator:newAnimation("climbing", 8, 9, 0.5)
+PlayerAnimator:newAnimation("walking", 3, 7, 0.5)
+PlayerAnimator:newAnimation("jumping", 8, 8)
+PlayerAnimator:newAnimation("climbing", 9, 10, 0.5)
+PlayerAnimator:newAnimation("typing", 11, 14, 0.5)
 
 -- keyboard(hammer)
 local keyboards = { {}, {} }
@@ -831,7 +832,9 @@ function love.update(dt)
 		-- player animations
 		local pvx, pvy = player.body:getLinearVelocity()
 		if player.isGrounded and not player.onLadder and pvx ~= 0 then
-			PlayerAnimator:play("walking")
+			if not player.holdingKeyboard then
+				PlayerAnimator:play("walking")
+			end
 			if pvx < 0 then
 				player.isLeft = true
 				PlayerAnimator:setMirrored(true)
@@ -841,16 +844,20 @@ function love.update(dt)
 			end
 		end
 
-		if pvx == 0 and pvy == 0 and not player.onLadder then
+		if pvx == 0 and pvy == 0 and not player.onLadder and not player.holdingKeyboard then
 			PlayerAnimator:play("idle")
 		end
 
-		if player.onLadder and not player.isGrounded then
+		if player.onLadder and not player.isGrounded and not player.holdingKeyboard then
 			PlayerAnimator:play("climbing")
 		end
 
-		if not player.onLadder and not player.isGrounded and pvy ~= 0 then
+		if not player.onLadder and not player.isGrounded and pvy ~= 0 and not player.holdingKeyboard then
 			PlayerAnimator:play("jumping")
+		end
+
+		if player.holdingKeyboard then
+			PlayerAnimator:play("typing")
 		end
 
 		if not PlayerAnimator.playing then
@@ -990,11 +997,13 @@ function love.draw()
 	elseif STATE == "game" then
 		local px = player.body:getX() - player.width / 2
 		local py = player.body:getY() - player.height / 2
-		if player.holdingKeyboard then
-			love.graphics.setColor(0, 1, 0)
-		else
-			love.graphics.setColor(1, 1, 1)
-		end
+
+		-- if player.holdingKeyboard then
+		-- 	love.graphics.setColor(0, 1, 0)
+		-- else
+		-- 	love.graphics.setColor(1, 1, 1)
+		-- end
+
 		-- love.graphics.rectangle("fill", px, py, player.width, player.height)
 		if player then
 			-- claude helped me figure out why I was getting a error with this line. I was trying to draw with the animator when I had no animations playing at start
