@@ -58,6 +58,12 @@ local spawnEnemyTimer = 0
 local baseEnemyClimbChance = 8
 EnemySpeed = 150
 
+-- semicolon animations
+local bossSprite = love.graphics.newImage("assets/Semicolon-Sheet.png")
+BossAnimator = lsa.new(bossSprite, 9, 1)
+BossAnimator:newAnimation("idle", 1, 5)
+BossAnimator:newAnimation("spawning", 6, 9, 1, 0.1, false)
+
 -- binary rain
 local binaryRain = {}
 
@@ -374,6 +380,7 @@ end
 function SpawnEnemy()
 	local e = {}
 	-- enemyCount = enemyCount + 1
+	BossAnimator:play("spawning")
 	e.name = "enemy"
 
 	-- transform
@@ -454,7 +461,7 @@ function SemicolonBossSetup()
 	b.x = 50
 	b.y = platforms[#platforms].body:getY() - PLATFORM_HEIGHT / 2 - b.height / 2
 	b.name = "semicolon"
-	b.skin = love.graphics.newImage("assets/Semicolon.png")
+	-- b.skin = love.graphics.newImage("assets/Semicolon.png")
 
 	-- physics setup
 	b.body = love.physics.newBody(World, b.x, b.y, "static")
@@ -864,6 +871,10 @@ function love.update(dt)
 			PlayerAnimator:play("idle")
 		end
 
+		if not BossAnimator.playing or BossAnimator.currentAnimation.frame == 9 then
+			BossAnimator:play("idle")
+		end
+
 		spawnEnemyTimer = spawnEnemyTimer + dt
 		if spawnEnemyTimer >= randomEnemySpawnInterval then
 			spawnEnemyTimer = 0
@@ -941,6 +952,7 @@ function love.update(dt)
 		end
 
 		PlayerAnimator:update(dt)
+		BossAnimator:update(dt)
 	end
 end
 
@@ -997,6 +1009,7 @@ function love.draw()
 	elseif STATE == "game" then
 		local px = player.body:getX() - player.width / 2
 		local py = player.body:getY() - player.height / 2
+		-- love.graphics.setColor(0, 0, 0, 1)
 
 		-- if player.holdingKeyboard then
 		-- 	love.graphics.setColor(0, 1, 0)
@@ -1039,6 +1052,7 @@ function love.draw()
 				if l then
 					-- used claude to help me find a aqua color and how to convert 255 rgb values to how lua does color
 					love.graphics.setColor(0.5, 0.5, 0.5)
+					-- love.graphics.setColor(0, 200 / 255, 220 / 255)
 					love.graphics.polygon("fill", l.body:getWorldPoints(l.shape:getPoints()))
 					local tileHeight = 16
 					for y = l.body:getY() - l.height / 2, l.body:getY() - l.height / 2 + l.height, tileHeight do
@@ -1057,7 +1071,11 @@ function love.draw()
 		-- enemys
 		for _, e in ipairs(enemies) do
 			if e then
-				love.graphics.setColor(1, 1, 1)
+				if not player.holdingKeyboard then
+					love.graphics.setColor(1, 1, 1)
+				else
+					love.graphics.setColor(1, 0, 0)
+				end
 				-- love.graphics.polygon("fill", e.body:getWorldPoints(e.shape:getPoints()))
 				if not e.enemyAnimator.mirrored then
 					e.enemyAnimator:draw(e.body:getX() - e.width / 2, e.body:getY() - e.height / 2, 0, 5, 0, 2, 2)
@@ -1070,11 +1088,13 @@ function love.draw()
 		-- semicolon boss
 		-- love.graphics.setColor(1, 0, 0)
 		-- love.graphics.polygon("fill", semicolon.body:getWorldPoints(semicolon.shape:getPoints()))
-		love.graphics.draw(
-			semicolon.skin,
-			semicolon.body:getX() - semicolon.width / 2,
-			semicolon.body:getY() - semicolon.height / 2
-		)
+		-- love.graphics.draw(
+		-- 	semicolon.skin,
+		-- 	semicolon.body:getX() - semicolon.width / 2,
+		-- 	semicolon.body:getY() - semicolon.height / 2
+		-- )
+
+		BossAnimator:draw(semicolon.body:getX(), semicolon.body:getY())
 
 		-- keyboards
 		for i, k in ipairs(keyboards) do
