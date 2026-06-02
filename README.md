@@ -17,10 +17,9 @@ then inside of the projects directory on your system you can run `love .` to pla
 - [x] Main boss enemy(like Donkey Kong)
 - [x] Enemy's coming down the screen (like barrles in the original)
 - [x] level system
--  Custom Art
+- [x] Custom Art
 - SFX
 
 #### known bugs:
 
 - enemies sometimes freeze
-- sometimes player can't climb ladders

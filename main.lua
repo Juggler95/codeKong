@@ -235,6 +235,7 @@ function PlayerSetup()
 	p.inPlatform = false
 	p.isGrounded = true
 	p.onLadder = false
+	p.onLadderWhenSafe = false
 	p.currentLadder = 0
 	p.groundTimer = 0
 	p.lives = 3
@@ -517,6 +518,7 @@ function ResetLocationsOnDamage()
 	randomEnemySpawnIntervalUpperBounds = 6
 	p.currentLadder = 0
 	p.onLadder = false
+	p.onLadderWhenSafe = false
 	p.isGrounded = true
 	p.canJump = true
 	p.canMove = true
@@ -666,6 +668,7 @@ function love.keypressed(key)
 
 	if STATE == "menu" then
 		if key == "space" then
+			RestartGame()
 			STATE = "game"
 		elseif key == "c" then
 			STATE = "controls"
@@ -725,6 +728,7 @@ function RestartGame()
 	p.tookDamage = false
 	p.isGrounded = true
 	p.onLadder = false
+	p.onLadderWhenSafe = false
 	p.currentLadder = 0
 	p.canUseLadder = true
 	p.holdingKeyboard = false
@@ -1237,8 +1241,16 @@ function beginCollision(a, b, coll)
 		-- platform checks
 		if objA.name == "player" and objB.name == "platform" then
 			objA.isGrounded = true
+			if objA.onLadderWhenSafe then
+				objA.onLadder = true
+				objA.onLadderWhenSafe = false
+			end
 		elseif objA.name == "platform" and objB.name == "player" then
 			objB.isGrounded = true
+			if objB.onLadderWhenSafe then
+				objB.onLadder = true
+				objB.onLadderWhenSafe = false
+			end
 		end
 
 		-- platform and binary rain check
@@ -1260,9 +1272,17 @@ function beginCollision(a, b, coll)
 
 		-- player and ladder checks
 		if objA.name == "player" and objB.name == "ladder" then
-			objA.onLadder = true
+			if objA.isGrounded then
+				objA.onLadder = true
+			else
+				objA.onLadderWhenSafe = true
+			end
 		elseif objA.name == "ladder" and objB.name == "player" then
-			objB.onLadder = true
+			if objB.isGrounded then
+				objB.onLadder = true
+			else
+				objB.onLadderWhenSafe = true
+			end
 		end
 
 		-- player and binary rain digits check
@@ -1427,6 +1447,7 @@ function WinReset()
 	p.tookDamage = false
 	p.isGrounded = true
 	p.onLadder = false
+	p.onLadderWhenSafe = false
 	p.currentLadder = 0
 	p.canUseLadder = true
 	p.canMove = true
