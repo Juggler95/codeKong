@@ -1,4 +1,3 @@
--- https://github.com/coelhucas/love-sprite-sheet-animator
 local lsa = require("modules.lsa")
 
 -- globals
@@ -8,6 +7,8 @@ LEVEL = 1
 STATE = "menu"
 USING_CONTROLLER = false
 
+local backgroundMusic = love.audio.newSource("assets/music/arcade-beat.mp3", "stream")
+
 local joysticks = love.joystick.getJoysticks()
 joystick = joysticks[1]
 
@@ -15,7 +16,7 @@ joystick = joysticks[1]
 local player = {}
 
 -- player animations
-local playerSprite = love.graphics.newImage("assets/Player-Sheet.png")
+local playerSprite = love.graphics.newImage("assets/sprites/Player-Sheet.png")
 PlayerAnimator = lsa.new(playerSprite, 14, 1)
 PlayerAnimator:newAnimation("idle", 1, 2, 0.5)
 PlayerAnimator:newAnimation("walking", 3, 7, 0.5)
@@ -59,7 +60,7 @@ local baseEnemyClimbChance = 8
 EnemySpeed = 150
 
 -- semicolon animations
-local bossSprite = love.graphics.newImage("assets/Semicolon-Sheet.png")
+local bossSprite = love.graphics.newImage("assets/sprites/Semicolon-Sheet.png")
 BossAnimator = lsa.new(bossSprite, 9, 1)
 BossAnimator:newAnimation("idle", 1, 5)
 BossAnimator:newAnimation("spawning", 6, 9, 1, 0.1, false)
@@ -120,7 +121,9 @@ function love.load()
 	World:setCallbacks(beginCollision, endCollision, preSolve, postSolve)
 
 	-- animations
-	enemySprite = love.graphics.newImage("assets/Bug-Sheet.png")
+	enemySprite = love.graphics.newImage("assets/sprites/Bug-Sheet.png")
+
+	backgroundMusic:play()
 
 	math.randomseed(os.time())
 
@@ -166,14 +169,14 @@ function PlatformSetup()
 	sp.y = love.graphics.getHeight()
 	sp.width = love.graphics.getWidth()
 	sp.name = "platform"
-	sp.tile = love.graphics.newImage("assets/Industrial_platform.png")
+	sp.tile = love.graphics.newImage("assets/sprites/Industrial_platform.png")
 
 	for i = 2, #plat do
 		local p = plat
 		p[i].y = p[i - 1].y - GAP - PLATFORM_HEIGHT
 		p[i].width = love.graphics.getWidth() - 100
 		p[i].name = "platform"
-		p[i].tile = love.graphics.newImage("assets/Industrial_platform.png")
+		p[i].tile = love.graphics.newImage("assets/sprites/Industrial_platform.png")
 		if i % 2 == 0 then
 			-- the - 50 is to align it on the left side
 			p[i].x = love.graphics.getWidth() / 2 - 50
@@ -187,7 +190,7 @@ function PlatformSetup()
 	ep.height = PLATFORM_HEIGHT
 	ep.x = love.graphics.getWidth() / 2 - ep.width / 2
 	ep.y = plat[#plat].y - PLATFORM_HEIGHT - GAP
-	ep.tile = love.graphics.newImage("assets/Industrial_platform.png")
+	ep.tile = love.graphics.newImage("assets/sprites/Industrial_platform.png")
 	ep.name = "platform"
 
 	for _, p in ipairs(platforms) do
@@ -246,6 +249,12 @@ function PlayerSetup()
 	p.winRestart = false
 	p.isLeft = false
 
+	-- sfx
+	p.jump = love.audio.newSource("assets/sfx/Jump.wav", "static")
+	p.jump:setVolume(0.2)
+	p.hit = love.audio.newSource("assets/sfx/Hit.wav", "static")
+	p.typing = love.audio.newSource("assets/sfx/Typing.mp3", "static")
+
 	-- physics setup
 	p.body = love.physics.newBody(World, p.starting_x, p.starting_y, "dynamic")
 	p.body:setFixedRotation(true)
@@ -271,7 +280,7 @@ function LadderSetup()
 
 	for _, t in ipairs(ladderTypes) do
 		for _, l in ipairs(t) do
-			l.tile = love.graphics.newImage("assets/Ladder-Tile.png")
+			l.tile = love.graphics.newImage("assets/sprites/Ladder-Tile.png")
 		end
 	end
 
@@ -319,7 +328,7 @@ function LadderSetup()
 	ed.height = 125
 	ed.x = endingPlatform.x + endingPlatform.width / 2 - ed.width / 2
 	ed.y = platforms[#platforms].y - PLATFORM_HEIGHT / 2 - ed.height / 2
-	ed.tile = love.graphics.newImage("assets/Ladder-Tile.png")
+	ed.tile = love.graphics.newImage("assets/sprites/Ladder-Tile.png")
 	ed.name = "ladder"
 
 	-- ladder physics
@@ -356,7 +365,8 @@ function KeyboardItemSetup()
 		k.name = "keyboard"
 		k.width = 20
 		k.height = 40
-		k.skin = love.graphics.newImage("assets/Keyboard.png")
+		k.skin = love.graphics.newImage("assets/sprites/Keyboard.png")
+		k.pickup = love.audio.newSource("assets/sfx/Keyboard_Pickup.wav", "static")
 	end
 	local k = keyboards
 	local pl = platforms
@@ -399,6 +409,9 @@ function SpawnEnemy()
 	e.currentLadder = 0
 	e.kill = false
 
+	-- sfx
+	e.rain = love.audio.newSource("assets/sfx/Rain.wav", "static")
+
 	-- physics
 	e.body = love.physics.newBody(World, e.starting_x, e.starting_y, "dynamic")
 	e.body:setFixedRotation(true)
@@ -438,9 +451,9 @@ function SpawnBinaryRainDigit()
 	-- logic
 	b.speed = math.random(100, 175)
 	if #binaryRain % 2 == 0 then
-		b.skin = love.graphics.newImage("assets/Binary0.png")
+		b.skin = love.graphics.newImage("assets/sprites/Binary0.png")
 	else
-		b.skin = love.graphics.newImage("assets/Binary1.png")
+		b.skin = love.graphics.newImage("assets/sprites/Binary1.png")
 	end
 
 	-- physics
@@ -462,7 +475,7 @@ function SemicolonBossSetup()
 	b.x = 50
 	b.y = platforms[#platforms].body:getY() - PLATFORM_HEIGHT / 2 - b.height / 2
 	b.name = "semicolon"
-	-- b.skin = love.graphics.newImage("assets/Semicolon.png")
+	-- b.skin = love.graphics.newImage("assets/sprites/Semicolon.png")
 
 	-- physics setup
 	b.body = love.physics.newBody(World, b.x, b.y, "static")
@@ -479,7 +492,7 @@ function ComputerObjectSetup()
 	c.x = 10 + c.width / 2
 	c.y = love.graphics.getHeight() - c.height / 2 - PLATFORM_HEIGHT / 2
 	c.name = "computer"
-	c.skin = love.graphics.newImage("assets/Computer.png")
+	c.skin = love.graphics.newImage("assets/sprites/Computer.png")
 
 	-- physics setup
 	c.body = love.physics.newBody(World, c.x, c.y, "static")
@@ -552,6 +565,8 @@ function PlayerMovement()
 		if love.keyboard.isDown("space") or love.keyboard.isDown("w") or love.keyboard.isDown("up") then
 			if p.isGrounded and p.onLadder == false then
 				p.isGrounded = false
+				p.jump:play()
+				-- love.audio.play(p.jump)
 				p.body:applyLinearImpulse(0, p.jumpHeight)
 			end
 			-- ladder movement logic
@@ -577,6 +592,7 @@ function PlayerMovement()
 			or joystick:isGamepadDown("a") and not p.onLadder and p.isGrounded
 		then
 			p.isGrounded = false
+			p.jump:play()
 			p.body:applyLinearImpulse(0, p.jumpHeight)
 		elseif
 			joystick:isGamepadDown("dpup") and p.onLadder
@@ -652,19 +668,20 @@ function love.keypressed(key)
 	if key == "escape" then
 		love.event.quit()
 	end
+
 	-- debug binds
-	if key == "m" then
-		STATE = "menu"
-	elseif key == "g" then
-		STATE = "game"
-	elseif key == "o" then
-		STATE = "gameOver"
-	elseif key == "9" then
-		SCORE = 999999
-	elseif key == "i" then
-		local y = platforms[#platforms].y - PLATFORM_HEIGHT / 2 - player.height / 2
-		player.body:setPosition(love.graphics.getWidth() / 2, y)
-	end
+	-- if key == "m" then
+	-- 	STATE = "menu"
+	-- elseif key == "g" then
+	-- 	STATE = "game"
+	-- elseif key == "o" then
+	-- 	STATE = "gameOver"
+	-- elseif key == "9" then
+	-- 	SCORE = 999999
+	-- elseif key == "i" then
+	-- 	local y = platforms[#platforms].y - PLATFORM_HEIGHT / 2 - player.height / 2
+	-- 	player.body:setPosition(love.graphics.getWidth() / 2, y)
+	-- end
 
 	if STATE == "menu" then
 		if key == "space" then
@@ -780,6 +797,10 @@ end
 function love.update(dt)
 	World:update(dt)
 
+	if not backgroundMusic:isPlaying() then
+		backgroundMusic:play()
+	end
+
 	if STATE == "game" then
 		if player.lives <= 0 then
 			STATE = "gameOver"
@@ -868,6 +889,7 @@ function love.update(dt)
 		end
 
 		if player.holdingKeyboard then
+			player.typing:play()
 			PlayerAnimator:play("typing")
 		end
 
@@ -947,6 +969,7 @@ function love.update(dt)
 		end
 
 		if player.tookDamage then
+			player.hit:play()
 			ResetLocationsOnDamage()
 		end
 
@@ -1347,6 +1370,7 @@ function beginCollision(a, b, coll)
 		-- enemy and computer checks
 		if objA.name == "enemy" and objB.name == "computer" then
 			if math.random(1, 4) == 1 then
+				objA.rain:play()
 				BINARY_RAIN_LENGTH = BINARY_RAIN_LENGTH + 5
 				if displayError == 0 then
 					displayError = math.random(1, #errorPopups)
@@ -1361,6 +1385,7 @@ function beginCollision(a, b, coll)
 			end
 		elseif objA.name == "computer" and objB.name == "enemy" then
 			if math.random(1, 4) == 1 then
+				objB.rain:play()
 				BINARY_RAIN_LENGTH = BINARY_RAIN_LENGTH + 5
 				if displayError == 0 then
 					displayError = math.random(1, #errorPopups)
@@ -1646,6 +1671,7 @@ end
 function PickupKeyboard(p, k)
 	for i, key in ipairs(keyboards) do
 		if key == k then
+			k.pickup:play()
 			table.remove(keyboards, i)
 			k.body:destroy()
 			break
