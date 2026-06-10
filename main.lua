@@ -8,6 +8,8 @@ STATE = "menu"
 USING_CONTROLLER = false
 
 local backgroundMusic = love.audio.newSource("assets/music/arcade-beat.mp3", "stream")
+backgroundMusic:setVolume(0.2)
+backgroundMusic:setLooping(true)
 
 local joysticks = love.joystick.getJoysticks()
 joystick = joysticks[1]
@@ -690,13 +692,24 @@ function love.keypressed(key)
 		elseif key == "c" then
 			STATE = "controls"
 		elseif key == "j" then
-			USING_CONTROLLER = not USING_CONTROLLER
+			local currentState = USING_CONTROLLER
+			if not currentState then
+				if joystick ~= nil then
+					USING_CONTROLLER = not USING_CONTROLLER
+				else
+					print("Please connect a controller before launching the game")
+				end
+			else
+				USING_CONTROLLER = not USING_CONTROLLER
+			end
 		end
 	elseif STATE == "gameOver" then
-		if key == "space" then
-			RestartGame()
-		elseif key == "m" then
-			STATE = "menu"
+		if not USING_CONTROLLER then
+			if key == "space" then
+				RestartGame()
+			elseif key == "m" then
+				STATE = "menu"
+			end
 		end
 	elseif STATE == "controls" then
 		if key == "space" then
@@ -713,7 +726,17 @@ function love.gamepadpressed(j, button)
 		elseif button == "a" then
 			STATE = "game"
 		elseif button == "y" then
-			USING_CONTROLLER = not USING_CONTROLLER
+			-- USING_CONTROLLER = not USING_CONTROLLER
+			local currentState = USING_CONTROLLER
+			if not currentState then
+				if joystick ~= nil then
+					USING_CONTROLLER = not USING_CONTROLLER
+				else
+					print("Please connect a controller before lauching the game")
+				end
+			else
+				USING_CONTROLLER = not USING_CONTROLLER
+			end
 		elseif button == "x" then
 			STATE = "controls"
 		end
@@ -728,6 +751,8 @@ function love.gamepadpressed(j, button)
 			STATE = "menu"
 		elseif button == "a" then
 			RestartGame()
+		elseif button == "y" then
+			love.event.quit()
 		end
 	elseif STATE == "game" then
 		if button == "start" then
@@ -1168,17 +1193,41 @@ function love.draw()
 		love.graphics.print("Lives: " .. tostring(player.lives), font, 10, 50)
 	elseif STATE == "gameOver" then
 		love.graphics.setColor(1, 0, 0)
-		local gameOverText = "GAME OVER!"
-		local finalScore = "Score: " .. tostring(SCORE)
-		local restartText = "Press Space to restart"
-		local goMainMenuText = "Press m to Return to the Main Menu"
-		local quitText = "Press ESC to Quit"
+		if not USING_CONTROLLER then
+			local gameOverText = "GAME OVER!"
+			local finalScore = "Score: " .. tostring(SCORE)
+			local restartText = "Press Space to restart"
+			local goMainMenuText = "Press m to Return to the Main Menu"
+			local quitText = "Press ESC to Quit"
 
-		love.graphics.print(gameOverText, font, love.graphics.getWidth() / 2 - font:getWidth(gameOverText) / 2, 150)
-		love.graphics.print(finalScore, font, love.graphics.getWidth() / 2 - font:getWidth(finalScore) / 2, 300)
-		love.graphics.print(restartText, font, love.graphics.getWidth() / 2 - font:getWidth(restartText) / 2, 450)
-		love.graphics.print(goMainMenuText, font, love.graphics.getWidth() / 2 - font:getWidth(goMainMenuText) / 2, 600)
-		love.graphics.print(quitText, font, love.graphics.getWidth() / 2 - font:getWidth(quitText) / 2, 750)
+			love.graphics.print(gameOverText, font, love.graphics.getWidth() / 2 - font:getWidth(gameOverText) / 2, 150)
+			love.graphics.print(finalScore, font, love.graphics.getWidth() / 2 - font:getWidth(finalScore) / 2, 300)
+			love.graphics.print(restartText, font, love.graphics.getWidth() / 2 - font:getWidth(restartText) / 2, 450)
+			love.graphics.print(
+				goMainMenuText,
+				font,
+				love.graphics.getWidth() / 2 - font:getWidth(goMainMenuText) / 2,
+				600
+			)
+			love.graphics.print(quitText, font, love.graphics.getWidth() / 2 - font:getWidth(quitText) / 2, 750)
+		elseif USING_CONTROLLER then
+			local gameOverText = "GAME OVER!"
+			local finalScore = "Score: " .. tostring(SCORE)
+			local restartText = "Press X/A to restart"
+			local goMainMenuText = "Press B/O to Return to the Main Menu"
+			local quitText = "Press Triangle/Y to Quit"
+
+			love.graphics.print(gameOverText, font, love.graphics.getWidth() / 2 - font:getWidth(gameOverText) / 2, 150)
+			love.graphics.print(finalScore, font, love.graphics.getWidth() / 2 - font:getWidth(finalScore) / 2, 300)
+			love.graphics.print(restartText, font, love.graphics.getWidth() / 2 - font:getWidth(restartText) / 2, 450)
+			love.graphics.print(
+				goMainMenuText,
+				font,
+				love.graphics.getWidth() / 2 - font:getWidth(goMainMenuText) / 2,
+				600
+			)
+			love.graphics.print(quitText, font, love.graphics.getWidth() / 2 - font:getWidth(quitText) / 2, 750)
+		end
 	elseif STATE == "controls" then
 		if not USING_CONTROLLER then
 			local leftControlsText = "Press 'a' or Left Arrow to move left"
